@@ -59,7 +59,7 @@ export default function Dashboard() {
     const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
     // Theme Toggle Engine
-    const [theme, setTheme] = useState<'light' | 'dark'>('dark');
+    const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
     // Progress Photos State
     const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
@@ -225,8 +225,12 @@ export default function Dashboard() {
             const sortedActiveSets = [...activeExerciseSets].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
             // Dashboard & Metric Cards dynamic mapping
-            const currentExercise1RM = sortedActiveSets.length > 0 ? Math.round(sortedActiveSets[0].estimated_1rm * 10) / 10 : 0;
-            const maxExercise1RM = activeExerciseSets.length > 0 ? Math.round(Math.max(...activeExerciseSets.map(s => s.estimated_1rm)) * 10) / 10 : 0;
+            // Real 1RM = heaviest weight lifted for exactly 1 rep; fallback to max weight lifted
+            const realMax1RMSets = activeExerciseSets.filter(s => s.reps === 1);
+            const currentExercise1RM = realMax1RMSets.length > 0
+            ? Math.round(Math.max(...realMax1RMSets.map(s => s.weight)) * 10) / 10
+            : 0;
+            const maxExercise1RM = currentExercise1RM;
             const maxWeightLifted = activeExerciseSets.length > 0 ? Math.max(...activeExerciseSets.map(s => s.weight)) : 0;
 
             // Analytics tab metrics computation
@@ -261,10 +265,11 @@ export default function Dashboard() {
             const personalBests = data.exercises.map(ex => {
                 const setsForExercise = data.fullHistoryFeed.filter(s => s.exercise_id === ex.id || s.exercise_name?.toLowerCase() === ex.name?.toLowerCase());
                 if (setsForExercise.length === 0) return { ...ex, maxWeight: 0, max1RM: 0, totalSets: 0 };
+                const real1RMSets = setsForExercise.filter(s => s.reps === 1);
                 return {
                     ...ex,
                     maxWeight: Math.max(...setsForExercise.map(s => s.weight)),
-                                                     max1RM: Math.max(...setsForExercise.map(s => s.estimated_1rm)),
+                                                     max1RM: real1RMSets.length > 0 ? Math.max(...real1RMSets.map(s => s.weight)) : 0,
                                                      totalSets: setsForExercise.length
                 };
             }).filter(ex => ex.totalSets > 0);
@@ -493,23 +498,23 @@ export default function Dashboard() {
 
                 <div className={`${cardBg} rounded-2xl p-5 flex flex-col justify-between`}>
                 <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">Active Current 1RM ({activeExerciseName})</span>
-                <div className="bg-rose-500/10 p-2 rounded-xl text-rose-500"><Dumbbell className="h-4 w-4" /></div>
+                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">Personal Best 1RM ({activeExerciseName})</span>
+                <div className="bg-amber-500/10 p-2 rounded-xl text-amber-500"><Trophy className="h-4 w-4" /></div>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1.5">
-                <span className="text-3xl font-black tracking-tight">{currentExercise1RM || '--'}</span>
+                <span className="text-3xl font-black tracking-tight">{maxExercise1RM || '--'}</span>
                 <span className="text-xs font-bold text-zinc-400">{unitLabel}</span>
                 </div>
                 </div>
 
                 <div className={`${cardBg} rounded-2xl p-5 flex flex-col justify-between`}>
                 <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">All-Time Peak Strength Ceiling</span>
-                <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-500"><Sparkles className="h-4 w-4" /></div>
+                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">Exercise Volume Rank</span>
+                <div className="bg-purple-500/10 p-2 rounded-xl text-purple-500"><TrendingUp className="h-4 w-4" /></div>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1.5">
-                <span className="text-3xl font-black tracking-tight">{maxExercise1RM || '--'}</span>
-                <span className="text-xs font-bold text-zinc-400">{unitLabel}</span>
+                <span className="text-3xl font-black tracking-tight">#{exercisePopularityRank || '--'}</span>
+                <span className="text-xs font-bold text-zinc-400">of {data.exercises.length}</span>
                 </div>
                 </div>
                 </div>
@@ -577,7 +582,7 @@ export default function Dashboard() {
 
                 <div className={`${cardBg} rounded-2xl p-4 flex flex-col justify-between`}>
                 <div className="flex items-center justify-between text-zinc-400">
-                <span className="font-bold uppercase tracking-wider text-[10px]">Calculated Peak 1RM</span>
+                <span className="font-bold uppercase tracking-wider text-[10px]">Peak 1RM (Real)</span>
                 <TrendingUp className="h-4 w-4 text-rose-500" />
                 </div>
                 <div className="mt-2">
@@ -611,7 +616,7 @@ export default function Dashboard() {
                 <XAxis dataKey="date" stroke="#71717A" fontSize={11} />
                 <YAxis stroke="#71717A" fontSize={11} />
                 <Tooltip contentStyle={isLight ? { backgroundColor: '#fff', borderColor: '#E4E4E7' } : { backgroundColor: '#141417', borderColor: '#26262B', color: '#fff' }} />
-                <Line type="monotone" dataKey="estimated_1rm" name="Calculated Top 1RM" stroke="#E11D48" strokeWidth={3} dot={{ r: 5 }} />
+                <Line type="monotone" dataKey="estimated_1rm" name="Tracked 1RM" stroke="#E11D48" strokeWidth={3} dot={{ r: 5 }} />
                 </LineChart>
                 </ResponsiveContainer>
                 </div>
@@ -639,27 +644,24 @@ export default function Dashboard() {
                         </div>
                         <div className="relative z-10">
                         <h4 className="text-sm font-black uppercase tracking-wider text-zinc-800 dark:text-zinc-200 border-b border-zinc-100 dark:border-zinc-800/80 pb-2 mb-4">{pb.name}</h4>
-
-                        <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">Max Weight Lifted</span>
-                        <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
-                        {pb.maxWeight || '--'}
-                        </span>
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase">{unitLabel}</span>
-                        </div>
-                        </div>
-                        <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-amber-500 tracking-wider uppercase block">Peak 1RM</span>
-                        <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black font-mono tracking-tight text-amber-500">
-                        {Math.round(pb.max1RM * 10) / 10 || '--'}
-                        </span>
-                        <span className="text-[10px] font-bold text-amber-500 uppercase">{unitLabel}</span>
-                        </div>
-                        </div>
-                        </div>
+                        {pb.max1RM ? (
+                            <div className="space-y-0.5">
+                            <span className="text-[10px] font-bold text-amber-500 tracking-wider uppercase block">Peak 1RM</span>
+                            <div className="flex items-baseline gap-1.5">
+                            <span className="text-5xl font-black font-mono tracking-tight text-amber-500">{Math.round(pb.max1RM * 10) / 10}</span>
+                            <span className="text-sm font-bold text-amber-500 uppercase">{unitLabel}</span>
+                            </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-0.5">
+                            <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">Max Weight Lifted</span>
+                            <div className="flex items-baseline gap-1.5">
+                            <span className="text-5xl font-black font-mono tracking-tight text-zinc-500">{pb.maxWeight}</span>
+                            <span className="text-sm font-bold text-zinc-400 uppercase">{unitLabel}</span>
+                            </div>
+                            <span className="text-[10px] text-zinc-400 mt-1 block">No 1-rep sets logged yet</span>
+                            </div>
+                        )}
                         </div>
 
                         <div className="flex justify-between items-center text-[10px] text-zinc-400 font-mono border-t border-zinc-100 dark:border-zinc-800/60 pt-3 mt-4 relative z-10">
@@ -892,6 +894,30 @@ export default function Dashboard() {
             {/* COMPONENT 7: SETTINGS PANEL */}
             {activeMenu === 'settings' && (
                 <div className="space-y-6 max-w-4xl text-xs">
+
+                <div className={`${cardBg} rounded-2xl p-6 space-y-5`}>
+                <div>
+                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Display & Appearance</h3>
+                <p className="text-[11px] text-zinc-400 mt-1">Control the visual theme of the interface.</p>
+                </div>
+                <div className="space-y-2">
+                <label className="text-zinc-400 font-bold block">Interface Theme</label>
+                <div className="flex gap-3">
+                <button
+                onClick={() => setTheme('light')}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl border font-bold transition-all text-xs ${theme === 'light' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
+                >
+                <Sun className="h-3.5 w-3.5" /> Light Mode
+                </button>
+                <button
+                onClick={() => setTheme('dark')}
+                className={`flex items-center gap-2 px-4 py-3 rounded-xl border font-bold transition-all text-xs ${theme === 'dark' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
+                >
+                <Moon className="h-3.5 w-3.5" /> Dark Mode
+                </button>
+                </div>
+                </div>
+                </div>
 
                 <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
                 <div>
