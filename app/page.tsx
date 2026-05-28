@@ -25,7 +25,11 @@ import {
     Menu,
     ImageIcon,
     Sun,
-    Moon
+    Moon,
+    Target,
+    TrendingUp,
+    Layers,
+    Calendar
 } from 'lucide-react';
 import {
     logWeight,
@@ -55,7 +59,7 @@ export default function Dashboard() {
     const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
     // Theme Toggle Engine
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [theme, setTheme] = useState<'light' | 'dark'>('dark');
 
     // Progress Photos State
     const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
@@ -98,18 +102,30 @@ export default function Dashboard() {
 
     useEffect(() => {
         document.title = "Trackerbuddy";
-        refreshData();
+        const defaultExerciseId = localStorage.getItem('trackerbuddy_default_exercise');
+        if (defaultExerciseId) {
+            setTargetExercise(parseInt(defaultExerciseId));
+        }
+        refreshData(defaultExerciseId ? parseInt(defaultExerciseId) : undefined);
+
         const savedPhotos = localStorage.getItem('workout_progress_photos');
         if (savedPhotos) {
             try { setPhotos(JSON.parse(savedPhotos)); } catch (e) { console.error(e); }
         }
         if (window.innerWidth < 1024) setIsRightPanelOpen(false);
-    }, [targetExercise]);
+    }, []);
 
         const refreshData = async (exerciseId?: number) => {
-            const res = await getDashboardData(exerciseId || targetExercise);
+            const currentTargetId = exerciseId !== undefined ? exerciseId : targetExercise;
+            const res = await getDashboardData(currentTargetId);
             setData(res);
-            if (!targetExercise && res.exercises.length > 0) setTargetExercise(res.exercises[0].id);
+
+            if (!currentTargetId && res.exercises.length > 0) {
+                const savedDefault = localStorage.getItem('trackerbuddy_default_exercise');
+                const defaultId = savedDefault ? parseInt(savedDefault) : res.exercises[0].id;
+                const exists = res.exercises.some(e => e.id === defaultId);
+                setTargetExercise(exists ? defaultId : res.exercises[0].id);
+            }
             if (!logExerciseId && res.exercises.length > 0) setLogExerciseId(res.exercises[0].id.toString());
         };
 
@@ -198,14 +214,52 @@ export default function Dashboard() {
                 );
             }
 
+            // --- CLIENT-SIDE PERFORMANCE COMPUTATION ENGINE ---
+            const activeExerciseName = data.exercises.find(e => e.id === targetExercise)?.name || 'Exercise';
+
+            const activeExerciseSets = data.fullHistoryFeed.filter(s =>
+            s.exercise_id === targetExercise ||
+            s.exercise_name?.toLowerCase() === activeExerciseName?.toLowerCase()
+            );
+
+            const sortedActiveSets = [...activeExerciseSets].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+            // Dashboard & Metric Cards dynamic mapping
+            const currentExercise1RM = sortedActiveSets.length > 0 ? Math.round(sortedActiveSets[0].estimated_1rm * 10) / 10 : 0;
+            const maxExercise1RM = activeExerciseSets.length > 0 ? Math.round(Math.max(...activeExerciseSets.map(s => s.estimated_1rm)) * 10) / 10 : 0;
+            const maxWeightLifted = activeExerciseSets.length > 0 ? Math.max(...activeExerciseSets.map(s => s.weight)) : 0;
+
+            // Analytics tab metrics computation
+            const totalVolumeLifted = activeExerciseSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
+            const totalSetsLogged = activeExerciseSets.length;
+
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const weeklyVolumeLifted = activeExerciseSets
+            .filter(s => new Date(s.date) >= sevenDaysAgo)
+            .reduce((sum, s) => sum + (s.weight * s.reps), 0);
+
+            const exerciseFrequencyMap = data.fullHistoryFeed.reduce((acc, s) => {
+                acc[s.exercise_name] = (acc[s.exercise_name] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+
+            const sortedExercisePopularity = Object.entries(exerciseFrequencyMap)
+            .sort((a, b) => b[1] - a[1])
+            .map(entry => entry[0]);
+
+            const exercisePopularityRank = sortedExercisePopularity.indexOf(activeExerciseName) + 1;
+
+            // Timeline History Aggregator
             const groupedHistory = data.fullHistoryFeed.reduce((acc, set) => {
                 if (!acc[set.date]) acc[set.date] = [];
                 acc[set.date].push(set);
                 return acc;
             }, {} as Record<string, WorkoutSet[]>);
 
+            // Hall of Fame configuration
             const personalBests = data.exercises.map(ex => {
-                const setsForExercise = data.fullHistoryFeed.filter(s => s.exercise_name === ex.name);
+                const setsForExercise = data.fullHistoryFeed.filter(s => s.exercise_id === ex.id || s.exercise_name?.toLowerCase() === ex.name?.toLowerCase());
                 if (setsForExercise.length === 0) return { ...ex, maxWeight: 0, max1RM: 0, totalSets: 0 };
                 return {
                     ...ex,
@@ -245,8 +299,6 @@ export default function Dashboard() {
             bmr = tdeeGender === 'male' ? bmr + 5 : bmr - 161;
             const computedTDEE = Math.round(bmr * parseFloat(tdeeActivity));
 
-            const activeExerciseName = data.exercises.find(e => e.id === targetExercise)?.name || 'Exercise';
-
             const menuItems = [
                 { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
                 { id: 'analytics', label: 'Analytics Curve', icon: BarChart3 },
@@ -269,7 +321,6 @@ export default function Dashboard() {
                 {/* 1. DESKTOP LEFT SIDEBAR */}
                 <aside className={`w-24 border-r ${leftSidebarBg} flex flex-col items-center py-8 justify-between hidden md:flex z-20 shrink-0`}>
                 <div className="space-y-10 flex flex-col items-center w-full">
-                {/* Dual-Tone Branded Logo Mark */}
                 <div className="h-12 w-12 bg-[#1E1E22] border border-zinc-800 rounded-xl flex items-center justify-center font-black text-lg shadow-inner tracking-tighter">
                 <span className="text-amber-500">T</span>
                 <span className="text-zinc-100">B</span>
@@ -385,8 +436,7 @@ export default function Dashboard() {
             <div className="flex-1 flex overflow-hidden relative pt-16 md:pt-0">
             <main className="flex-1 flex flex-col h-full overflow-hidden p-4 md:p-8 space-y-6">
 
-            {/* Main Top Header Block with Bold Stylized Typography */}
-            <div className="hidden md:flex items-center justify-between shrink-0">
+            <div className="flex items-center justify-between shrink-0">
             <div>
             <div className="flex items-center gap-2 text-xl font-black tracking-tighter uppercase">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">TRACKER</span>
@@ -397,10 +447,14 @@ export default function Dashboard() {
             <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mt-1">your personal weight & performance telemetry platform</p>
             </div>
             <div>
-            {activeMenu === 'dashboard' && data.exercises.length > 0 && (
+            {(activeMenu === 'dashboard' || activeMenu === 'analytics') && data.exercises.length > 0 && (
                 <select
                 value={targetExercise}
-                onChange={(e) => setTargetExercise(parseInt(e.target.value))}
+                onChange={(e) => {
+                    const id = parseInt(e.target.value);
+                    setTargetExercise(id);
+                    refreshData(id);
+                }}
                 className={`border rounded-xl text-xs font-bold px-4 py-2 text-zinc-700 outline-none cursor-pointer ${isLight ? 'bg-white border-zinc-200' : 'bg-[#141417] border-[#26262B] text-zinc-200'}`}
                 >
                 {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
@@ -409,7 +463,6 @@ export default function Dashboard() {
             </div>
             </div>
 
-            {/* VIEWPORT CONTROLLER SWITCHES */}
             <div className="flex-1 min-h-0 overflow-y-auto pr-1">
 
             {/* COMPONENT 1: DASHBOARD VIEW */}
@@ -422,7 +475,7 @@ export default function Dashboard() {
                 <div className="bg-amber-500/10 p-2 rounded-xl text-amber-500"><Scale className="h-4 w-4" /></div>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1.5">
-                <span className="text-3xl font-black tracking-tight">{data.metrics.currentWeight || '--'}</span>
+                <span className="text-3xl font-black tracking-tight">{data.weightData.length > 0 ? data.weightData[data.weightData.length - 1].weight : '--'}</span>
                 <span className="text-xs font-bold text-zinc-400">{unitLabel}</span>
                 <div className="ml-3 inline-block">
                 {data.metrics.weightChange <= 0 ? (
@@ -438,14 +491,13 @@ export default function Dashboard() {
                 </div>
                 </div>
 
-                {/* TYPO FIX: Changed currentBeach1RM to currentBench1RM */}
                 <div className={`${cardBg} rounded-2xl p-5 flex flex-col justify-between`}>
                 <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">Active Peak 1RM ({activeExerciseName})</span>
+                <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase">Active Current 1RM ({activeExerciseName})</span>
                 <div className="bg-rose-500/10 p-2 rounded-xl text-rose-500"><Dumbbell className="h-4 w-4" /></div>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1.5">
-                <span className="text-3xl font-black tracking-tight">{data.metrics.currentBench1RM || '--'}</span>
+                <span className="text-3xl font-black tracking-tight">{currentExercise1RM || '--'}</span>
                 <span className="text-xs font-bold text-zinc-400">{unitLabel}</span>
                 </div>
                 </div>
@@ -456,16 +508,16 @@ export default function Dashboard() {
                 <div className="bg-emerald-500/10 p-2 rounded-xl text-emerald-500"><Sparkles className="h-4 w-4" /></div>
                 </div>
                 <div className="mt-4 flex items-baseline gap-1.5">
-                <span className="text-3xl font-black tracking-tight">{data.metrics.maxBench1RM || '--'}</span>
+                <span className="text-3xl font-black tracking-tight">{maxExercise1RM || '--'}</span>
                 <span className="text-xs font-bold text-zinc-400">{unitLabel}</span>
                 </div>
                 </div>
                 </div>
 
                 <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-5 min-h-0">
-                <div className={`${cardBg} p-5 rounded-2xl flex flex-col h-[260px] lg:h-full`}>
+                <div className={`${cardBg} p-5 rounded-2xl flex flex-col h-72 lg:h-full`}>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">Body Mass Parameter Tracking</h3>
-                <div className="flex-1 min-h-0 w-full">
+                <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.weightData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} vertical={false} />
@@ -478,9 +530,9 @@ export default function Dashboard() {
                 </div>
                 </div>
 
-                <div className={`${cardBg} p-5 rounded-2xl flex flex-col h-[260px] lg:h-full`}>
+                <div className={`${cardBg} p-5 rounded-2xl flex flex-col h-72 lg:h-full`}>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-4">{activeExerciseName} Strength Trajectory</h3>
-                <div className="flex-1 min-h-0 w-full">
+                <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.selectedExerciseData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} vertical={false} />
@@ -496,22 +548,65 @@ export default function Dashboard() {
                 </div>
             )}
 
-            {/* COMPONENT 2: ANALYTICS CURVE */}
+            {/* COMPONENT 2: DEEP ANALYTICS UPGRADE */}
             {activeMenu === 'analytics' && (
-                <div className={`${cardBg} rounded-2xl p-5 h-full flex flex-col min-h-0 space-y-4`}>
-                <div className="flex items-center justify-between shrink-0">
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Analytical Metric Dynamic Curve</h3>
-                <select
-                value={targetExercise}
-                onChange={(e) => setTargetExercise(parseInt(e.target.value))}
-                className={`border rounded-xl text-xs font-bold px-3 py-1.5 outline-none ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-[#1E1E22] border-[#26262B] text-white'}`}
-                >
-                {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
-                </select>
+                <div className="h-full flex flex-col space-y-6 min-h-0">
+                {/* Metrics Analytics Dashboard Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 shrink-0 text-xs">
+                <div className={`${cardBg} rounded-2xl p-4 flex flex-col justify-between`}>
+                <div className="flex items-center justify-between text-zinc-400">
+                <span className="font-bold uppercase tracking-wider text-[10px]">Total Tonnage Lifted</span>
+                <Layers className="h-4 w-4 text-amber-500" />
                 </div>
-                <div className="flex-1 min-h-0 w-full">
+                <div className="mt-2">
+                <span className="text-2xl font-black">{totalVolumeLifted.toLocaleString()}</span>
+                <span className="text-[10px] text-zinc-400 ml-1 font-bold uppercase">{unitLabel}</span>
+                </div>
+                </div>
+
+                <div className={`${cardBg} rounded-2xl p-4 flex flex-col justify-between`}>
+                <div className="flex items-center justify-between text-zinc-400">
+                <span className="font-bold uppercase tracking-wider text-[10px]">Weekly Workload (7d)</span>
+                <Calendar className="h-4 w-4 text-emerald-500" />
+                </div>
+                <div className="mt-2">
+                <span className="text-2xl font-black">{weeklyVolumeLifted.toLocaleString()}</span>
+                <span className="text-[10px] text-zinc-400 ml-1 font-bold uppercase">{unitLabel}</span>
+                </div>
+                </div>
+
+                <div className={`${cardBg} rounded-2xl p-4 flex flex-col justify-between`}>
+                <div className="flex items-center justify-between text-zinc-400">
+                <span className="font-bold uppercase tracking-wider text-[10px]">Calculated Peak 1RM</span>
+                <TrendingUp className="h-4 w-4 text-rose-500" />
+                </div>
+                <div className="mt-2">
+                <span className="text-2xl font-black">{maxExercise1RM || '--'}</span>
+                <span className="text-[10px] text-zinc-400 ml-1 font-bold uppercase">{unitLabel}</span>
+                </div>
+                </div>
+
+                <div className={`${cardBg} rounded-2xl p-4 flex flex-col justify-between`}>
+                <div className="flex items-center justify-between text-zinc-400">
+                <span className="font-bold uppercase tracking-wider text-[10px]">Exercise Volume Rank</span>
+                <Trophy className="h-4 w-4 text-purple-500" />
+                </div>
+                <div className="mt-2">
+                <span className="text-2xl font-black">#{exercisePopularityRank || '--'}</span>
+                <span className="text-[10px] text-zinc-400 ml-1 font-medium">out of {data.exercises.length}</span>
+                </div>
+                </div>
+                </div>
+
+                {/* Primary Chart Container */}
+                <div className={`${cardBg} rounded-2xl p-5 flex-1 flex flex-col min-h-[300px]`}>
+                <div className="mb-4">
+                <h3 className="text-xs font-black text-zinc-400 uppercase tracking-wider">Analytical Metric Dynamic Curve ({activeExerciseName})</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Visual representation of calculated performance increments over historical data parameters.</p>
+                </div>
+                <div className="h-64 lg:flex-1 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.selectedExerciseData}>
+                <LineChart data={data.selectedExerciseData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} />
                 <XAxis dataKey="date" stroke="#71717A" fontSize={11} />
                 <YAxis stroke="#71717A" fontSize={11} />
@@ -521,18 +616,19 @@ export default function Dashboard() {
                 </ResponsiveContainer>
                 </div>
                 </div>
+                </div>
             )}
 
-            {/* COMPONENT 3: PERSONAL BESTS (Massive lifter-friendly numbers) */}
+            {/* COMPONENT 3: PERSONAL BESTS */}
             {activeMenu === 'pbs' && (
                 <div className="space-y-4">
                 <div className="border-b border-zinc-200/60 dark:border-zinc-800 pb-3">
                 <h3 className="text-sm font-black uppercase tracking-wider">Absolute Performance Hall of Fame</h3>
-                <p className="text-xs text-zinc-400 mt-0.5">Automatically tracked absolute metrics and calculated peak limits.</p>
+                <p className="text-xs text-zinc-400 mt-0.5">Automatically tracked metrics and calculated peak limits.</p>
                 </div>
                 {personalBests.length === 0 ? (
                     <div className={`${cardBg} rounded-2xl p-8 text-center text-zinc-400 text-xs`}>
-                    No logs found. Add sets in the right parameters panel to log dynamic records.
+                    No logs found. Add sets in the right parameters panel to log records.
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -546,16 +642,20 @@ export default function Dashboard() {
 
                         <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-0.5">
-                        <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">Ground Max</span>
+                        <span className="text-[10px] font-bold text-zinc-400 tracking-wider uppercase block">Max Weight Lifted</span>
                         <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">{pb.maxWeight}</span>
+                        <span className="text-4xl font-black font-mono tracking-tight text-zinc-900 dark:text-white">
+                        {pb.maxWeight || '--'}
+                        </span>
                         <span className="text-[10px] font-bold text-zinc-400 uppercase">{unitLabel}</span>
                         </div>
                         </div>
                         <div className="space-y-0.5">
                         <span className="text-[10px] font-bold text-amber-500 tracking-wider uppercase block">Peak 1RM</span>
                         <div className="flex items-baseline gap-1">
-                        <span className="text-4xl font-black font-mono tracking-tight text-amber-500">{pb.max1RM}</span>
+                        <span className="text-4xl font-black font-mono tracking-tight text-amber-500">
+                        {Math.round(pb.max1RM * 10) / 10 || '--'}
+                        </span>
                         <span className="text-[10px] font-bold text-amber-500 uppercase">{unitLabel}</span>
                         </div>
                         </div>
@@ -589,7 +689,7 @@ export default function Dashboard() {
                 </div>
                 <div className="space-y-1.5">
                 <label className="text-zinc-400 font-medium">Caption / Linked Workout Note</label>
-                <input type="text" placeholder="Conditioning check following dynamic workout..." value={photoCaption} onChange={e => setPhotoCaption(e.target.value)} className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-900' : 'bg-[#1E1E22] border-[#26262B] text-white'}`} />
+                <input type="text" placeholder="Conditioning check following workout..." value={photoCaption} onChange={e => setPhotoCaption(e.target.value)} className={`w-full border rounded-xl px-3 py-2 focus:outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-900' : 'bg-[#1E1E22] border-[#26262B] text-white'}`} />
                 </div>
                 <div className="md:col-span-3 flex justify-end pt-1">
                 <button type="submit" disabled={!photoFile} className="bg-amber-500 disabled:opacity-40 text-black font-black text-xs px-5 py-2.5 rounded-xl transition-colors hover:bg-amber-400">
@@ -604,7 +704,7 @@ export default function Dashboard() {
                 {photos.length === 0 ? (
                     <div className={`${cardBg} rounded-2xl p-10 text-center text-zinc-400 text-xs flex flex-col items-center justify-center gap-2`}>
                     <ImageIcon className="h-6 w-6 text-zinc-300" />
-                    <span>No visual records logged yet. Upload progress snapshots above.</span>
+                    <span>No visual records logged yet. Upload snapshots above.</span>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -664,10 +764,10 @@ export default function Dashboard() {
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 flex-1 items-center">
                                     <span className="font-bold">{set.exercise_name}</span>
                                     <span className="text-zinc-400 font-medium">{set.weight} {unitLabel} × {set.reps} Reps</span>
-                                    <span className="text-rose-500 font-black text-[11px] sm:text-right">Est 1RM: {set.estimated_1rm} {unitLabel}</span>
+                                    <span className="text-rose-500 font-black text-[11px] sm:text-right">Est 1RM: {Math.round(set.estimated_1rm * 10) / 10} {unitLabel}</span>
                                     </div>
                                     <button
-                                    onClick={async () => { if(confirm("Prune this set log parameter?")) { await deleteWorkoutSet(set.id); refreshData(); } }}
+                                    onClick={async () => { if(confirm("Prune this log entry?")) { await deleteWorkoutSet(set.id); refreshData(); } }}
                                     className="text-zinc-400 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-500/10 transition-colors ml-4"
                                     >
                                     <Trash2 className="h-3.5 w-3.5" />
@@ -796,7 +896,7 @@ export default function Dashboard() {
                 <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
                 <div>
                 <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Automated Workspace Data Exports</h3>
-                <p className="text-[11px] text-zinc-400 mt-1">Acquire an external spreadsheet snapshot of your logged body parameters and performance history logs.</p>
+                <p className="text-[11px] text-zinc-400 mt-1">Acquire an external spreadsheet snapshot of your metrics and performance history logs.</p>
                 </div>
                 <div className="pt-2">
                 <button
@@ -811,11 +911,11 @@ export default function Dashboard() {
 
                     <div className={`${cardBg} rounded-2xl p-6 space-y-5`}>
                     <div>
-                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Localization Parameter Standardizations</h3>
-                    <p className="text-[11px] text-zinc-400 mt-1">Configure global structural units applied dynamically system-wide across all views.</p>
+                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Localization & Preference Standardizations</h3>
+                    <p className="text-[11px] text-zinc-400 mt-1">Configure global structural units and layout defaults applied dynamically system-wide.</p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-1">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
                     <div className="space-y-2">
                     <label className="text-zinc-400 font-bold block">Weight Metric Scale</label>
                     <select
@@ -851,13 +951,30 @@ export default function Dashboard() {
                     <option value="epley">Epley Volumetric Formula Curve</option>
                     </select>
                     </div>
+
+                    <div className="space-y-2">
+                    <label className="text-zinc-400 font-bold flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-amber-500" />
+                    Standard Dashboard Target Lift
+                    </label>
+                    <select
+                    value={localStorage.getItem('trackerbuddy_default_exercise') || (data.exercises[0]?.id.toString() || '')}
+                    onChange={(e) => {
+                        localStorage.setItem('trackerbuddy_default_exercise', e.target.value);
+                        setTargetExercise(parseInt(e.target.value));
+                    }}
+                    className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
+                    >
+                    {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                    </select>
+                    </div>
                     </div>
                     </div>
 
                     <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
                     <div>
                     <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Exercise Tracked Index Masterlist</h3>
-                    <p className="text-[11px] text-zinc-400 mt-1">Append custom structural target exercise movements directly into selection entry list structures.</p>
+                    <p className="text-[11px] text-zinc-400 mt-1">Append custom movements directly into selection entry list structures.</p>
                     </div>
 
                     <form onSubmit={handleCreateExercise} className="flex gap-3 max-w-xl pt-1">
@@ -880,7 +997,7 @@ export default function Dashboard() {
                         <div key={ex.id} className={`flex items-center justify-between p-3 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-[#1E1E22] border-zinc-800'}`}>
                         <span className="font-bold text-zinc-400 dark:text-zinc-300">{ex.name}</span>
                         <button
-                        onClick={async () => { if(confirm(`Prune exercise "${ex.name}"? This action cascades and purges all logs linked here.`)) { await deleteExercise(ex.id); refreshData(); } }}
+                        onClick={async () => { if(confirm(`Prune exercise "${ex.name}"? This action cascades and purges all linked logs.`)) { await deleteExercise(ex.id); refreshData(); } }}
                         className="text-zinc-400 hover:text-rose-500 p-1.5 rounded-lg transition-colors"
                         >
                         <X className="h-4 w-4" />
@@ -897,7 +1014,7 @@ export default function Dashboard() {
             </div>
             </main>
 
-            {/* 3. RIGHT PANEL - METRICS LOG ENGINE (Fully Collapsible on Desktop Layouts) */}
+            {/* 3. RIGHT PANEL - METRICS LOG ENGINE */}
             {isRightPanelOpen && (
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden" onClick={() => setIsRightPanelOpen(false)} />
             )}
@@ -984,32 +1101,31 @@ export default function Dashboard() {
 
             </div>
 
-            {/* Modern Typography Artwork Block */}
+            {/* Minimalist Branded Typography Block */}
             <div className="space-y-4 shrink-0 mt-auto pt-4">
             <div className="relative overflow-hidden rounded-2xl bg-zinc-950 p-5 border border-zinc-800/50 select-none group">
-            <div className="absolute right-3 top-3 opacity-20 text-zinc-700 font-mono text-[8px] tracking-widest uppercase">sys_v2.6</div>
             <div className="flex flex-col tracking-tighter leading-none font-black uppercase">
             <span className="text-zinc-800 text-[28px] transition-colors duration-300 group-hover:text-zinc-700">RAW.</span>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 font-black tracking-tight text-[38px] my-0.5">HEAVY.</span>
             <span className="text-zinc-600/30 text-[26px] tracking-normal line-through decoration-rose-500/40 decoration-2">LIMITLESS.</span>
             </div>
-            <div className="mt-4 flex items-center justify-between text-[9px] text-zinc-500 font-mono tracking-wider uppercase border-t border-zinc-800/40 pt-3">
-            <span>EST. 2026 // TRKRBDY</span>
+            <div className="mt-4 flex items-center justify-between text-[9px] text-zinc-600 font-mono tracking-wider uppercase border-t border-zinc-800/40 pt-3">
+            <span>PERFORMANCE MODULE</span>
             <span className="text-emerald-500 font-bold flex items-center gap-1">
             <span className="h-1 w-1 rounded-full bg-emerald-500 animate-ping" />
-            ONLINE
+            CONNECTED
             </span>
             </div>
             </div>
 
             <div className="pt-1 flex items-center justify-between text-[10px] text-zinc-600 font-mono tracking-tight">
-            <span>TRACKERBUDDY ENGINE</span>
+            <span>TRACKERBUDDY INTEGRATION</span>
             <span>BY BILLGOLDBERGMANIA</span>
             </div>
             </div>
             </aside>
 
-            {/* Right Sidebar Collapsed Tab Trigger Button */}
+            {/* Right Sidebar Trigger Button */}
             {!isRightPanelOpen && (
                 <button
                 onClick={() => setIsRightPanelOpen(true)}
@@ -1017,7 +1133,7 @@ export default function Dashboard() {
                     ${isLight ? 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50' : 'bg-[#141417] border-zinc-800 text-white hover:bg-zinc-800'}`}
                     title="Open Metric Engine Panel"
                     >
-                    <ChevronRight className="h-4 w-4 rotate-180 text-amber-500 animate-pulse" />
+                    <ChevronRight className="h-4 w-4 rotate-180 text-amber-500" />
                     </button>
             )}
 
