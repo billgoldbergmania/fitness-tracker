@@ -90,3 +90,13 @@ export async function deletePhoto(id: string) {
     const userId = getCurrentUserId();
     return serverActions.deletePhoto(id, userId);
 }
+
+export async function setDefaultExercise(exerciseId: number | null) {
+    const userId = getCurrentUserId();
+    return serverActions.setDefaultExercise(userId, exerciseId);
+}
+
+export async function getDefaultExercise() {
+    const userId = getCurrentUserId();
+    return serverActions.getDefaultExercise(userId);
+}

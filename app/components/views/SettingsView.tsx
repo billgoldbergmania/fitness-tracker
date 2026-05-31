@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sun, Moon, User, Ruler, Dumbbell, Download, AlertTriangle, Trash2, Edit2, Save, X, Plus } from 'lucide-react';
-import { getUsers, addUser, updateUserName, deleteUser, updateUserProfile } from '@/lib/actions-client';
+import { getUsers, addUser, updateUserName, deleteUser, updateUserProfile, setDefaultExercise, getDefaultExercise } from '@/lib/actions-client';
 import { setCurrentUserId, getCurrentUserId } from '@/lib/user-client';
 
 interface SettingsViewProps {
@@ -54,6 +54,9 @@ export default function SettingsView({
     const [newUserName, setNewUserName] = useState('');
     const [showAddUser, setShowAddUser] = useState(false);
 
+    // Default exercise state
+    const [defaultExerciseId, setDefaultExerciseId] = useState<number | null>(null);
+
     const loadUsers = async () => {
         const allUsers = await getUsers();
         setUsers(allUsers);
@@ -62,6 +65,12 @@ export default function SettingsView({
 
     useEffect(() => {
         loadUsers();
+        // Load default exercise from DB
+        const loadDefaultExercise = async () => {
+            const id = await getDefaultExercise();
+            setDefaultExerciseId(id);
+        };
+        loadDefaultExercise();
     }, []);
 
     const handleSwitchUser = async (userId: number) => {
@@ -70,6 +79,9 @@ export default function SettingsView({
         refreshData();
         await refreshUserName();
         await loadUsers();
+        // Reload default exercise for new user
+        const id = await getDefaultExercise();
+        setDefaultExerciseId(id);
     };
 
     const handleAddUser = async () => {
@@ -111,7 +123,13 @@ export default function SettingsView({
         );
         setProfileSaved(true);
         setTimeout(() => setProfileSaved(false), 2000);
-        // Also refresh dashboard to update BMI
+        refreshData();
+    };
+
+    const handleDefaultExerciseChange = async (exerciseId: number) => {
+        setDefaultExerciseId(exerciseId);
+        await setDefaultExercise(exerciseId);
+        // Also update the dashboard default for immediate effect
         refreshData();
     };
 
@@ -237,16 +255,18 @@ export default function SettingsView({
         <div className="space-y-1.5 pt-1">
         <label className="text-zinc-400 font-bold block">Dashboard Default Exercise</label>
         <select
-        value={localStorage.getItem('trackerbuddy_default_exercise') || (data.exercises[0]?.id.toString() || '')}
-        onChange={(e) => { localStorage.setItem('trackerbuddy_default_exercise', e.target.value); window.location.reload(); }}
+        value={defaultExerciseId ?? data.exercises[0]?.id ?? ''}
+        onChange={(e) => handleDefaultExerciseChange(parseInt(e.target.value))}
         className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
         >
-        {data.exercises.map((ex: any) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+        {data.exercises.map((ex: any) => (
+            <option key={ex.id} value={ex.id}>{ex.name}</option>
+        ))}
         </select>
         </div>
         </div>
 
-        {/* Athlete Profile Card (now saves to DB) */}
+        {/* Athlete Profile Card */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <User className="h-4 w-4 text-blue-500" />
@@ -281,7 +301,7 @@ export default function SettingsView({
         </button>
         </div>
 
-        {/* Units & Measurements, Exercise Library, Export, Danger Zone – unchanged */}
+        {/* Units & Measurements */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Ruler className="h-4 w-4 text-emerald-500" />
@@ -317,6 +337,7 @@ export default function SettingsView({
         </div>
         </div>
 
+        {/* Exercise Library */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Dumbbell className="h-4 w-4 text-rose-500" />
@@ -343,6 +364,7 @@ export default function SettingsView({
         </div>
         </div>
 
+        {/* Export + Danger Zone */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">

@@ -105,6 +105,9 @@ try {
     if (!userCols.some(c => c.name === 'height_cm')) {
         db.exec(`ALTER TABLE users ADD COLUMN height_cm REAL`);
     }
+    if (!userCols.some(c => c.name === 'default_exercise_id')) {
+        db.exec(`ALTER TABLE users ADD COLUMN default_exercise_id INTEGER`);
+    }
 } catch (e) { /* ignore */ }
 
 // Insert default user if missing
@@ -156,6 +159,16 @@ export async function deleteUser(userId: number) {
     db.prepare(`DELETE FROM progress_photos WHERE user_id = ?`).run(userId);
     db.prepare(`DELETE FROM users WHERE id = ?`).run(userId);
     revalidatePath('/');
+}
+
+export async function setDefaultExercise(userId: number, exerciseId: number | null) {
+    db.prepare(`UPDATE users SET default_exercise_id = ? WHERE id = ?`).run(exerciseId, userId);
+    revalidatePath('/');
+}
+
+export async function getDefaultExercise(userId: number): Promise<number | null> {
+    const row = db.prepare(`SELECT default_exercise_id FROM users WHERE id = ?`).get(userId) as { default_exercise_id: number | null } | undefined;
+    return row?.default_exercise_id ?? null;
 }
 
 // ========== WEIGHT GOAL (PER USER) ==========
