@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { Sun, Moon, User, Ruler, Dumbbell, Download, AlertTriangle, Trash2, Edit2, Save, X, Plus } from 'lucide-react';
 import { getUsers, addUser, updateUserName, deleteUser, updateUserProfile, setDefaultExercise, getDefaultExercise } from '@/lib/actions-client';
 import { setCurrentUserId, getCurrentUserId } from '@/lib/user-client';
+// Import client wrappers for deleteWeight and deleteWorkoutSet (they auto-inject userId)
+import { deleteWeight, deleteWorkoutSet } from '@/lib/actions-client';
 
 interface SettingsViewProps {
     theme: 'light' | 'dark';
@@ -46,15 +48,12 @@ export default function SettingsView({
     tdeeAge, setTdeeAge, tdeeGender, setTdeeGender,
     tdeeHeight, setTdeeHeight, cardBg
 }: SettingsViewProps) {
-    // ========== USER MANAGEMENT STATE ==========
     const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
     const [currentUserId, setCurrentUserIdState] = useState<number>(1);
     const [editingUserId, setEditingUserId] = useState<number | null>(null);
     const [editName, setEditName] = useState('');
     const [newUserName, setNewUserName] = useState('');
     const [showAddUser, setShowAddUser] = useState(false);
-
-    // Default exercise state
     const [defaultExerciseId, setDefaultExerciseId] = useState<number | null>(null);
 
     const loadUsers = async () => {
@@ -65,7 +64,6 @@ export default function SettingsView({
 
     useEffect(() => {
         loadUsers();
-        // Load default exercise from DB
         const loadDefaultExercise = async () => {
             const id = await getDefaultExercise();
             setDefaultExerciseId(id);
@@ -79,7 +77,6 @@ export default function SettingsView({
         refreshData();
         await refreshUserName();
         await loadUsers();
-        // Reload default exercise for new user
         const id = await getDefaultExercise();
         setDefaultExerciseId(id);
         window.location.reload();
@@ -130,8 +127,25 @@ export default function SettingsView({
     const handleDefaultExerciseChange = async (exerciseId: number) => {
         setDefaultExerciseId(exerciseId);
         await setDefaultExercise(exerciseId);
-        // Also update the dashboard default for immediate effect
         refreshData();
+    };
+
+    // Clear weight log using client wrapper
+    const handleClearWeightLog = async () => {
+        if (!confirm('Clear ALL weight log entries? This cannot be undone.')) return;
+        for (const w of data.weightData) {
+            await deleteWeight(w.date);
+        }
+        setTimeout(() => refreshData(), 300);
+    };
+
+    // Clear workout history using client wrapper
+    const handleClearWorkoutHistory = async () => {
+        if (!confirm('Clear ALL workout sets? This cannot be undone.')) return;
+        for (const s of data.fullHistoryFeed) {
+            await deleteWorkoutSet(s.id);
+        }
+        setTimeout(() => refreshData(), 300);
     };
 
     return (
@@ -395,7 +409,7 @@ export default function SettingsView({
         <p className="font-bold text-zinc-700 dark:text-zinc-300">Clear Weight Log</p>
         <p className="text-[10px] text-zinc-400 mt-0.5">Removes all body weight entries.</p>
         </div>
-        <button onClick={() => { if(confirm('Clear ALL weight log entries? This cannot be undone.')) { data.weightData.forEach((w: any) => import('@/lib/actions').then(m => m.deleteWeight(w.date))); setTimeout(refreshData, 300); } }} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
+        <button onClick={handleClearWeightLog} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
         Clear
         </button>
         </div>
@@ -404,7 +418,7 @@ export default function SettingsView({
         <p className="font-bold text-zinc-700 dark:text-zinc-300">Clear Workout History</p>
         <p className="text-[10px] text-zinc-400 mt-0.5">Removes all logged sets permanently.</p>
         </div>
-        <button onClick={() => { if(confirm('Clear ALL workout sets? This cannot be undone.')) { data.fullHistoryFeed.forEach((s: any) => import('@/lib/actions').then(m => m.deleteWorkoutSet(s.id))); setTimeout(refreshData, 300); } }} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
+        <button onClick={handleClearWorkoutHistory} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
         Clear
         </button>
         </div>

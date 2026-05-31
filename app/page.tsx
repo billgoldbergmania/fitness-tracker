@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import type { WeightData, Exercise, WorkoutSet } from '../lib/actions';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
     Scale, Dumbbell, Sparkles, ArrowDown, ArrowUp, LayoutDashboard, BarChart3,
@@ -21,7 +22,7 @@ import {
     getUsers,
     addUser,
     getWeightGoal,
-    setWeightGoal,
+    setWeightGoal as setWeightGoalAction,
     getUserProfile,
     updateUserProfile,
     getDefaultExercise,
@@ -215,7 +216,7 @@ export default function Dashboard() {
         const goalNum = parseFloat(val);
         if (isNaN(goalNum)) return;
         try {
-            await setWeightGoal(goalNum);
+            await setWeightGoalAction(goalNum);
             setWeightGoal(val);
             setWeightGoalInput('');
         } catch (err) {

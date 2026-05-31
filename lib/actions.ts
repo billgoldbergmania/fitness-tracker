@@ -237,9 +237,8 @@ export async function deletePhoto(id: string, userId: number) {
 // ========== DASHBOARD DATA ==========
 export async function getDashboardData(selectedExerciseId?: number, userId?: number) {
     if (!userId) throw new Error("userId required");
-    const settings = await getUserSettings() as UserSettings;
+    const settings = await getUserSettings() as unknown as UserSettings;
     const isImperial = settings.weight_unit === 'lbs';
-
     const weightRows = db.prepare(`SELECT date, weight FROM weight_logs WHERE user_id = ? ORDER BY date ASC`).all(userId) as { date: string; weight: number }[];
     const weightData: WeightData[] = weightRows.map((row, index) => {
         const startIdx = Math.max(0, index - 6);
@@ -384,9 +383,12 @@ export async function logSessionSet(sessionId: number, exerciseId: number, setNu
 
 export async function completeWorkoutSession(sessionId: number, notes?: string) {
     db.prepare(`UPDATE workout_sessions SET completed_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ?`).run(notes || null, sessionId);
-    const session = db.prepare(`SELECT user_id, date, routine_id FROM workout_sessions WHERE id = ?`).get(sessionId);
+    const session = db.prepare(`SELECT user_id, date, routine_id FROM workout_sessions WHERE id = ?`).get(sessionId) as { user_id: number; date: string; routine_id: number } | undefined;
     if (!session) return;
-    const sets = db.prepare(`SELECT * FROM workout_session_sets WHERE session_id = ?`).all(sessionId);
+
+    // Explicitly type the sets array
+    const sets = db.prepare(`SELECT exercise_id, weight, reps FROM workout_session_sets WHERE session_id = ?`).all(sessionId) as { exercise_id: number; weight: number; reps: number }[];
+
     const insertSet = db.prepare(`INSERT INTO workout_sets (date, exercise_id, weight, reps, estimated_1rm, user_id) VALUES (?, ?, ?, ?, ?, ?)`);
     for (const set of sets) {
         const estimated_1rm = set.reps > 1 ? Math.round(set.weight * (1 + set.reps / 30) * 10) / 10 : set.weight;

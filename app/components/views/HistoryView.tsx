@@ -1,3 +1,5 @@
+'use client';
+
 import React from 'react';
 import { Scale, Dumbbell, Trash2, ChevronRight, ChevronDown } from 'lucide-react';
 
@@ -37,7 +39,8 @@ export default function HistoryView({
     cardBg,
     isLight
 }: HistoryViewProps) {
-    const groupedHistory = data.fullHistoryFeed.reduce((acc: Record<string, WorkoutSet[]>, set: WorkoutSet) => {
+    // Explicitly type groupedHistory
+    const groupedHistory: Record<string, WorkoutSet[]> = data.fullHistoryFeed.reduce((acc: Record<string, WorkoutSet[]>, set: WorkoutSet) => {
         if (!acc[set.date]) acc[set.date] = [];
         acc[set.date].push(set);
         return acc;
@@ -45,7 +48,7 @@ export default function HistoryView({
 
     return (
         <div className="space-y-4 h-full flex flex-col min-h-0">
-        {/* Weight log */}
+        {/* Weight log section */}
         <div className={`${cardBg} rounded-2xl overflow-hidden shrink-0`}>
         <div className={`flex items-center gap-2 p-4 border-b ${isLight ? 'border-zinc-100' : 'border-zinc-800/60'}`}>
         <Scale className="h-3.5 w-3.5 text-amber-500" />
@@ -105,7 +108,7 @@ export default function HistoryView({
         )}
         </div>
 
-        {/* Workout sets */}
+        {/* Workout sets section */}
         <div className={`${cardBg} rounded-2xl p-4 flex flex-col flex-1 min-h-0 space-y-3`}>
         <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
@@ -122,9 +125,10 @@ export default function HistoryView({
         <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
         {(() => {
             const q = historySearch.toLowerCase().trim();
+            // Use the typed groupedHistory
             const filteredHistory = Object.entries(groupedHistory)
             .map(([date, sets]) => {
-                const filtered = q ? sets.filter(s => s.exercise_name?.toLowerCase().includes(q)) : sets;
+                const filtered = q ? (sets as WorkoutSet[]).filter(s => s.exercise_name?.toLowerCase().includes(q)) : sets;
                 return [date, filtered] as [string, WorkoutSet[]];
             })
             .filter(([, sets]) => sets.length > 0)

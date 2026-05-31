@@ -126,7 +126,8 @@ export default function WorkoutsView({ cardBg, isLight, exercises }: WorkoutsVie
                 await updateRoutine(selectedRoutine.id, editName, exercisesToSave);
             } else {
                 const newId = await createRoutine(editName);
-                await updateRoutine(newId, editName, exercisesToSave);
+                // Convert bigint to number
+                await updateRoutine(Number(newId), editName, exercisesToSave);
             }
             setIsEditing(false);
             setSelectedRoutine(null);
@@ -173,7 +174,8 @@ export default function WorkoutsView({ cardBg, isLight, exercises }: WorkoutsVie
     const handleStartWorkout = async (routineId: number) => {
         try {
             const sessionId = await startWorkoutSession(routineId);
-            setActiveSessionId(sessionId);
+            // Convert bigint to number
+            setActiveSessionId(Number(sessionId));
             const routine = await getRoutine(routineId);
             setActiveRoutine(routine);
             setCurrentExerciseIndex(0);

@@ -30,7 +30,6 @@ interface RightPanelProps {
     benchReps: string;
     setBenchReps: (val: string) => void;
     handleWorkoutSubmit: (e: React.FormEvent) => void;
-    isLight: boolean;
 }
 
 export default function RightPanel({
@@ -59,8 +58,7 @@ export default function RightPanel({
     setBenchWeight,
     benchReps,
     setBenchReps,
-    handleWorkoutSubmit,
-    isLight
+    handleWorkoutSubmit
 }: RightPanelProps) {
     useEffect(() => {
         if (isRightPanelOpen && window.innerWidth < 1024) {
@@ -81,13 +79,14 @@ export default function RightPanel({
         return total > 0 ? (done / total) * 100 : 100;
     })())) : 0;
 
-    const panelBg = isLight ? 'bg-white' : 'bg-[#1E1E22]';
-    const textColor = isLight ? 'text-zinc-800' : 'text-white';
-    const borderColor = isLight ? 'border-zinc-200' : 'border-zinc-800/80';
-    const cardBg = isLight ? 'bg-zinc-50' : 'bg-[#141417]';
-    const cardBorder = isLight ? 'border-zinc-200' : 'border-zinc-800/60';
-    const inputBg = isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-900' : 'bg-[#1E1E22] border-zinc-800 text-white';
-    const labelColor = isLight ? 'text-zinc-600' : 'text-zinc-500';
+    // Fixed dark styles – no light mode
+    const panelBg = 'bg-[#1E1E22]';
+    const textColor = 'text-white';
+    const borderColor = 'border-zinc-800/80';
+    const cardBg = 'bg-[#141417]';
+    const cardBorder = 'border-zinc-800/60';
+    const inputBg = 'bg-[#1E1E22] border-zinc-800 text-white';
+    const labelColor = 'text-zinc-500';
 
     return (
         <>
@@ -109,13 +108,13 @@ export default function RightPanel({
     <div>
     <h2 className="text-[11px] font-black uppercase tracking-widest flex items-center gap-2">
     <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-    <span className={isLight ? 'text-zinc-700' : 'text-white'}>METRICS LOG ENGINE</span>
+    <span className="text-white">METRICS LOG ENGINE</span>
     </h2>
     <p className="text-[9px] text-zinc-500 font-mono uppercase mt-0.5">telemetry commit port</p>
     </div>
     <button
     onClick={() => setIsRightPanelOpen(false)}
-    className={`p-1.5 rounded-xl border transition-colors ${isLight ? 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200' : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'}`}
+    className="p-1.5 rounded-xl border bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"
     >
     <X className="h-3.5 w-3.5" />
     </button>
@@ -124,8 +123,8 @@ export default function RightPanel({
     {/* Body Weight Tracker */}
     <div className={`rounded-xl border shadow-md overflow-hidden ${cardBg} ${cardBorder}`}>
     <button
-    onClick={() => setPanelWeightOpen(v => !v)}
-    className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${isLight ? 'hover:bg-zinc-100' : 'hover:bg-zinc-800/30'}`}
+    onClick={() => setPanelWeightOpen(!panelWeightOpen)}
+    className="w-full flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-zinc-800/30"
     >
     <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-500 text-[10px]">
     <Scale className="h-3.5 w-3.5" />
@@ -190,8 +189,8 @@ export default function RightPanel({
     {/* Exercise Tracker */}
     <div className={`rounded-xl border shadow-md overflow-hidden ${cardBg} ${cardBorder}`}>
     <button
-    onClick={() => setPanelExerciseOpen(v => !v)}
-    className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${isLight ? 'hover:bg-zinc-100' : 'hover:bg-zinc-800/30'}`}
+    onClick={() => setPanelExerciseOpen(!panelExerciseOpen)}
+    className="w-full flex items-center justify-between px-3 py-2.5 transition-colors hover:bg-zinc-800/30"
     >
     <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-rose-500 text-[10px]">
     <Dumbbell className="h-3.5 w-3.5" />
