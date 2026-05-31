@@ -1,5 +1,7 @@
+'use client';
+
 import React from 'react';
-import { Plus, X, Menu, Moon, Sun } from 'lucide-react';
+import { Plus, X, Menu, Moon, Sun, User } from 'lucide-react';
 
 interface MenuItem {
     id: string;
@@ -18,6 +20,7 @@ interface MobileNavProps {
     setTheme: (theme: 'light' | 'dark') => void;
     isLight: boolean;
     menuItems: MenuItem[];
+    currentUserName: string;
 }
 
 export default function MobileNav({
@@ -30,7 +33,8 @@ export default function MobileNav({
     theme,
     setTheme,
     isLight,
-    menuItems
+    menuItems,
+    currentUserName
 }: MobileNavProps) {
     return (
         <>
@@ -44,6 +48,11 @@ export default function MobileNav({
         <span className="text-xs font-black uppercase tracking-wider text-amber-500">
         Trackerbuddy <span className="text-zinc-400 dark:text-zinc-500 font-medium font-mono text-[10px] ml-1">• {activeMenu}</span>
         </span>
+        {/* Username indicator (mobile) */}
+        <div className="flex items-center gap-1 ml-2">
+        <User className="h-3 w-3 text-amber-500" />
+        <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400">{currentUserName}</span>
+        </div>
         </div>
         <div className="flex items-center gap-2">
         <button

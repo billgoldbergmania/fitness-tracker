@@ -1,5 +1,8 @@
-import React from 'react';
+'use client';
+
+import { useEffect, useState } from 'react';
 import { ImageIcon, Trash2 } from 'lucide-react';
+import { getPhotos, savePhoto, deletePhoto } from '@/lib/actions-client';
 
 interface ProgressPhoto {
     id: string;
@@ -9,32 +12,50 @@ interface ProgressPhoto {
 }
 
 interface ProgressPhotosViewProps {
-    photos: ProgressPhoto[];
-    photoDate: string;
-    setPhotoDate: (date: string) => void;
-    photoCaption: string;
-    setPhotoCaption: (caption: string) => void;
-    photoFile: string | null;
-    handlePhotoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    handleSavePhoto: (e: React.FormEvent) => void;
-    handleDeletePhoto: (id: string) => void;
     cardBg: string;
     isLight: boolean;
+    // No more props from parent – everything is self‑contained via actions
 }
 
-export default function ProgressPhotosView({
-    photos,
-    photoDate,
-    setPhotoDate,
-    photoCaption,
-    setPhotoCaption,
-    photoFile,
-    handlePhotoUpload,
-    handleSavePhoto,
-    handleDeletePhoto,
-    cardBg,
-    isLight
-}: ProgressPhotosViewProps) {
+export default function ProgressPhotosView({ cardBg, isLight }: ProgressPhotosViewProps) {
+    const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
+    const [photoDate, setPhotoDate] = useState(new Date().toISOString().split('T')[0]);
+    const [photoCaption, setPhotoCaption] = useState('');
+    const [photoFile, setPhotoFile] = useState<string | null>(null);
+
+    const loadPhotos = async () => {
+        const fetched = await getPhotos();
+        setPhotos(fetched as ProgressPhoto[]);
+    };
+
+    useEffect(() => {
+        loadPhotos();
+    }, []);
+
+    const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => { setPhotoFile(reader.result as string); };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleSavePhoto = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!photoFile) return;
+        const id = Math.random().toString(36).substr(2, 9);
+        await savePhoto(id, photoDate, photoFile, photoCaption || 'Workout Progression Entry');
+        setPhotoCaption('');
+        setPhotoFile(null);
+        await loadPhotos();
+    };
+
+    const handleDeletePhoto = async (id: string) => {
+        await deletePhoto(id);
+        await loadPhotos();
+    };
+
     return (
         <div className="space-y-6">
         <div className={`${cardBg} rounded-2xl p-5`}>

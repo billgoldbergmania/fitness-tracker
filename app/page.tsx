@@ -8,12 +8,28 @@ import {
     Calculator, Trophy, Camera, Menu, ImageIcon, Sun, Moon, Target, TrendingUp,
     Layers, Calendar, User, Zap, Bell, Timer, AlertTriangle, Flame, Ruler
 } from 'lucide-react';
-import {
-    logWeight, deleteWeight, createExercise, deleteExercise, logWorkoutSet,
-    deleteWorkoutSet, getDashboardData, updateSetting, WeightData, Exercise, WorkoutSet
-} from '../lib/actions';
 
-// Import extracted components
+// Only updateSetting comes from the raw server action
+import { updateSetting } from '../lib/actions';
+
+// Everything else from client wrapper
+import {
+    logWeight,
+    deleteWeight,
+    createExercise,
+    deleteExercise,
+    logWorkoutSet,
+    deleteWorkoutSet,
+    getDashboardData,
+    getUsers,
+    addUser,
+    getWeightGoal,
+    setWeightGoal
+} from '@/lib/actions-client';
+
+import { getCurrentUserId } from '@/lib/user-client';
+
+// Components
 import LeftSidebar from './components/LeftSidebar';
 import MobileNav from './components/MobileNav';
 import RightPanel from './components/RightPanel';
@@ -32,6 +48,26 @@ interface ProgressPhoto {
     caption: string;
 }
 
+// Missing types from actions – define locally
+interface WeightData {
+    date: string;
+    weight: number;
+    movingAvg: number | null;
+}
+interface Exercise {
+    id: number;
+    name: string;
+}
+interface WorkoutSet {
+    id: number;
+    date: string;
+    exercise_id: number;
+    exercise_name: string;
+    weight: number;
+    reps: number;
+    estimated_1rm: number;
+}
+
 export default function Dashboard() {
     const [activeMenu, setActiveMenu] = useState('dashboard');
     const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
@@ -41,10 +77,8 @@ export default function Dashboard() {
     const [historySearch, setHistorySearch] = useState('');
 
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [weightGoal, setWeightGoal] = useState<string>(() => {
-        if (typeof window !== 'undefined') return localStorage.getItem('trackerbuddy_weight_goal') || '';
-        return '';
-    });
+    // Weight goal – now per user, stored in DB
+    const [weightGoal, setWeightGoalState] = useState<string>('');
     const [weightGoalInput, setWeightGoalInput] = useState('');
     const [panelWeightOpen, setPanelWeightOpen] = useState(true);
     const [panelExerciseOpen, setPanelExerciseOpen] = useState(true);
@@ -94,6 +128,38 @@ export default function Dashboard() {
     const [tdeeGender, setTdeeGender] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_gender') || 'male' : 'male');
     const [tdeeActivity, setTdeeActivity] = useState('1.55');
 
+    // Current user name
+    const [currentUserName, setCurrentUserName] = useState<string>('');
+
+    // Load user name and weight goal when component mounts or user changes
+    const refreshUserName = async () => {
+        try {
+            const users = await getUsers();
+            const activeId = getCurrentUserId();
+            const active = users.find(u => u.id === activeId);
+            setCurrentUserName(active?.name || 'User');
+        } catch (e) {
+            console.error('Failed to load user name', e);
+        }
+    };
+
+    const loadWeightGoal = async () => {
+        try {
+            const goal = await getWeightGoal();
+            setWeightGoalState(goal !== null ? goal.toString() : '');
+        } catch (e) {
+            console.error('Failed to load weight goal', e);
+        }
+    };
+
+    useEffect(() => {
+        refreshUserName();
+    }, []);
+
+    useEffect(() => {
+        loadWeightGoal();
+    }, [currentUserName]); // Reload when user changes
+
     useEffect(() => {
         document.title = "Trackerbuddy";
         const defaultExerciseId = localStorage.getItem('trackerbuddy_default_exercise');
@@ -141,13 +207,16 @@ export default function Dashboard() {
                 }
             };
 
-            const handleSaveWeightGoal = (e: React.FormEvent) => {
+            const handleSaveWeightGoal = async (e: React.FormEvent) => {
                 e.preventDefault();
                 const val = weightGoalInput.trim();
                 if (!val) return;
-                setWeightGoal(val);
-                localStorage.setItem('trackerbuddy_weight_goal', val);
+                const goalNum = parseFloat(val);
+                if (isNaN(goalNum)) return;
+                await setWeightGoal(goalNum);
+                setWeightGoalState(val);
                 setWeightGoalInput('');
+                // Optionally show a success message
             };
 
             const handleWorkoutSubmit = async (e: React.FormEvent) => {
@@ -227,18 +296,14 @@ export default function Dashboard() {
                 );
             }
 
-            // --- CLIENT-SIDE PERFORMANCE COMPUTATIONS (unchanged) ---
+            // Computations (same as before)
             const activeExerciseName = data.exercises.find(e => e.id === targetExercise)?.name || 'Exercise';
             const activeExerciseSets = data.fullHistoryFeed.filter(s =>
             s.exercise_id === targetExercise || s.exercise_name?.toLowerCase() === activeExerciseName?.toLowerCase()
             );
-            const sortedActiveSets = [...activeExerciseSets].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
             const realMax1RMSets = activeExerciseSets.filter(s => s.reps === 1);
-            const currentExercise1RM = realMax1RMSets.length > 0 ? Math.round(Math.max(...realMax1RMSets.map(s => s.weight)) * 10) / 10 : 0;
-            const maxExercise1RM = currentExercise1RM;
-            const maxWeightLifted = activeExerciseSets.length > 0 ? Math.max(...activeExerciseSets.map(s => s.weight)) : 0;
+            const maxExercise1RM = realMax1RMSets.length > 0 ? Math.round(Math.max(...realMax1RMSets.map(s => s.weight)) * 10) / 10 : 0;
             const totalVolumeLifted = activeExerciseSets.reduce((sum, s) => sum + (s.weight * s.reps), 0);
-            const totalSetsLogged = activeExerciseSets.length;
             const sevenDaysAgo = new Date();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
             const weeklyVolumeLifted = activeExerciseSets.filter(s => new Date(s.date) >= sevenDaysAgo).reduce((sum, s) => sum + (s.weight * s.reps), 0);
@@ -292,7 +357,6 @@ export default function Dashboard() {
             const isLight = theme === 'light';
             const cardBg = isLight ? 'bg-white border-zinc-200/80 shadow-sm' : 'bg-[#141417] border-[#26262B] shadow-xl';
             const mainStageBg = isLight ? 'bg-[#FAF9F6]' : 'bg-[#0F0F11]';
-            const leftSidebarBg = isLight ? 'bg-white border-zinc-200' : 'bg-[#141417] border-[#26262B]';
             const mainText = isLight ? 'text-zinc-900' : 'text-[#E4E4E7]';
 
             const menuItems = [
@@ -321,6 +385,7 @@ export default function Dashboard() {
                 <div className="flex-1 flex overflow-hidden relative pt-16 md:pt-0">
                 <main className="flex-1 flex flex-col h-full overflow-hidden p-4 md:p-8 space-y-6">
                 <div className="hidden md:flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-4">
                 <div>
                 <div className="flex items-center gap-2 text-xl font-black tracking-tighter uppercase">
                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">TRACKER</span>
@@ -329,6 +394,11 @@ export default function Dashboard() {
                 <h1 className="text-zinc-400 dark:text-zinc-500 font-bold tracking-widest text-base self-center">{activeMenu.toUpperCase()}</h1>
                 </div>
                 <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mt-1">your personal weight & performance telemetry platform</p>
+                </div>
+                <div className="flex items-center gap-1.5 ml-3">
+                <User className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{currentUserName}</span>
+                </div>
                 </div>
                 {(activeMenu === 'dashboard' || activeMenu === 'analytics') && data.exercises.length > 0 && (
                     <select
@@ -390,15 +460,6 @@ export default function Dashboard() {
                 )}
                 {activeMenu === 'photos' && (
                     <ProgressPhotosView
-                    photos={photos}
-                    photoDate={photoDate}
-                    setPhotoDate={setPhotoDate}
-                    photoCaption={photoCaption}
-                    setPhotoCaption={setPhotoCaption}
-                    photoFile={photoFile}
-                    handlePhotoUpload={handlePhotoUpload}
-                    handleSavePhoto={handleSavePhoto}
-                    handleDeletePhoto={handleDeletePhoto}
                     cardBg={cardBg}
                     isLight={isLight}
                     />
@@ -459,6 +520,7 @@ export default function Dashboard() {
                     isLight={isLight}
                     data={data}
                     refreshData={refreshData}
+                    refreshUserName={refreshUserName}
                     exportToCSV={exportToCSV}
                     profileAge={profileAge}
                     setProfileAge={setProfileAge}
@@ -473,7 +535,7 @@ export default function Dashboard() {
                     handleCreateExercise={handleCreateExercise}
                     deleteExercise={deleteExercise}
                     weightGoal={weightGoal}
-                    setWeightGoal={setWeightGoal}
+                    setWeightGoal={setWeightGoalState}
                     unitLabel={unitLabel}
                     tdeeAge={tdeeAge}
                     setTdeeAge={setTdeeAge}
@@ -539,6 +601,7 @@ export default function Dashboard() {
                 setTheme={setTheme}
                 isLight={isLight}
                 menuItems={menuItems}
+                currentUserName={currentUserName}
                 />
                 </div>
             );
