@@ -82,6 +82,7 @@ export default function SettingsView({
         // Reload default exercise for new user
         const id = await getDefaultExercise();
         setDefaultExerciseId(id);
+        window.location.reload();
     };
 
     const handleAddUser = async () => {

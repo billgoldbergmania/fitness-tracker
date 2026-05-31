@@ -38,7 +38,8 @@ export default function LeftSidebar({
         <span className="text-zinc-100">B</span>
         </div>
         <nav className="flex flex-col items-center gap-4 w-full px-2">
-        {menuItems.slice(0, 6).map((item) => {
+        {/* Show all menu items (no slice) */}
+        {menuItems.map((item) => {
             const Icon = item.icon;
             return (
                 <button

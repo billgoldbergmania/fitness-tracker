@@ -100,3 +100,57 @@ export async function getDefaultExercise() {
     const userId = getCurrentUserId();
     return serverActions.getDefaultExercise(userId);
 }
+// ========== WORKOUT ROUTINES ==========
+export async function getRoutines() {
+    const userId = getCurrentUserId();
+    return serverActions.getRoutines(userId);
+}
+
+export async function getRoutine(routineId: number) {
+    const userId = getCurrentUserId();
+    return serverActions.getRoutine(userId, routineId);
+}
+
+export async function createRoutine(name: string) {
+    const userId = getCurrentUserId();
+    return serverActions.createRoutine(userId, name);
+}
+
+export async function updateRoutine(routineId: number, name: string, exercises: any[]) {
+    const userId = getCurrentUserId();
+    return serverActions.updateRoutine(userId, routineId, name, exercises);
+}
+
+export async function deleteRoutine(routineId: number) {
+    const userId = getCurrentUserId();
+    return serverActions.deleteRoutine(userId, routineId);
+}
+
+// ========== WORKOUT SESSIONS ==========
+export async function startWorkoutSession(routineId: number) {
+    const userId = getCurrentUserId();
+    return serverActions.startWorkoutSession(userId, routineId);
+}
+
+export async function getActiveSession(sessionId: number) {
+    const userId = getCurrentUserId();
+    return serverActions.getActiveSession(userId, sessionId);
+}
+
+export async function logSessionSet(sessionId: number, exerciseId: number, setNumber: number, weight: number, reps: number, isWarmup: boolean, isFailure: boolean) {
+    return serverActions.logSessionSet(sessionId, exerciseId, setNumber, weight, reps, isWarmup, isFailure);
+}
+
+export async function completeWorkoutSession(sessionId: number, notes?: string) {
+    return serverActions.completeWorkoutSession(sessionId, notes);
+}
+
+export async function getLastSuccessfulWeight(exerciseId: number) {
+    const userId = getCurrentUserId();
+    return serverActions.getLastSuccessfulWeight(userId, exerciseId);
+}
+
+export async function getWorkoutSessions() {
+    const userId = getCurrentUserId();
+    return serverActions.getWorkoutSessions(userId);
+}

@@ -74,6 +74,53 @@ CREATE TABLE IF NOT EXISTS progress_photos (
     caption TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Workout routines
+CREATE TABLE IF NOT EXISTS routines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS routine_exercises (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    routine_id INTEGER NOT NULL,
+    exercise_id INTEGER NOT NULL,
+    order_index INTEGER NOT NULL,
+    target_sets INTEGER NOT NULL DEFAULT 3,
+    target_reps INTEGER NOT NULL DEFAULT 5,
+    target_weight REAL,
+    rest_seconds INTEGER DEFAULT 60,
+    FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE,
+                                              FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS workout_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    routine_id INTEGER NOT NULL,
+    date TEXT NOT NULL,
+    completed_at DATETIME,
+    notes TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                                             FOREIGN KEY (routine_id) REFERENCES routines(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS workout_session_sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    exercise_id INTEGER NOT NULL,
+    set_number INTEGER NOT NULL,
+    weight REAL NOT NULL,
+    reps INTEGER NOT NULL,
+    is_warmup BOOLEAN DEFAULT 0,
+    is_failure BOOLEAN DEFAULT 0,
+    notes TEXT,
+    FOREIGN KEY (session_id) REFERENCES workout_sessions(id) ON DELETE CASCADE,
+                                                 FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+);
 `);
 
 // Add missing columns (safe, no drops)
@@ -109,6 +156,23 @@ try {
         db.exec(`ALTER TABLE users ADD COLUMN default_exercise_id INTEGER`);
     }
 } catch (e) { /* ignore */ }
+
+// Migrate weight_logs to composite primary key (date, user_id)
+try {
+    db.exec(`
+    CREATE TABLE weight_logs_new (
+        date TEXT NOT NULL,
+        weight REAL NOT NULL,
+        user_id INTEGER NOT NULL,
+        PRIMARY KEY (date, user_id)
+    );
+    INSERT INTO weight_logs_new (date, weight, user_id) SELECT date, weight, user_id FROM weight_logs;
+    DROP TABLE weight_logs;
+    ALTER TABLE weight_logs_new RENAME TO weight_logs;
+    `);
+} catch (e) {
+    // Already migrated – ignore
+}
 
 // Insert default user if missing
 db.prepare(`INSERT OR IGNORE INTO users (id, name) VALUES (1, 'Default User')`).run();
@@ -210,7 +274,7 @@ export async function getUserSettings(): Promise<Record<string, string>> {
 
 // ========== WEIGHT LOGS ==========
 export async function logWeight(date: string, weight: number, userId: number) {
-    db.prepare(`INSERT INTO weight_logs (date, weight, user_id) VALUES (?, ?, ?) ON CONFLICT(date) DO UPDATE SET weight = excluded.weight, user_id = excluded.user_id`)
+    db.prepare(`INSERT INTO weight_logs (date, weight, user_id) VALUES (?, ?, ?) ON CONFLICT(date, user_id) DO UPDATE SET weight = excluded.weight`)
     .run(date, weight, userId);
     revalidatePath('/');
 }
@@ -299,18 +363,26 @@ export async function getDashboardData(selectedExerciseId?: number, userId?: num
     const exercises = db.prepare(`SELECT id, name FROM exercises WHERE user_id = ? ORDER BY name ASC`).all(userId) as Exercise[];
     const activeExerciseId = selectedExerciseId || exercises[0]?.id || 0;
 
+    // Get actual 1RM (reps=1) for each date, or fallback to heaviest weight that day
     const chartSets = db.prepare(`
-    SELECT date, MAX(estimated_1rm) as estimated_1rm
-    FROM workout_sets
-    WHERE exercise_id = ? AND user_id = ?
-    GROUP BY date
-    ORDER BY date ASC
-    `).all(activeExerciseId, userId) as { date: string; estimated_1rm: number }[];
+    SELECT date,
+    MAX(CASE WHEN reps = 1 THEN weight ELSE NULL END) as actual_1rm,
+                                 MAX(weight) as max_weight
+                                 FROM workout_sets
+                                 WHERE exercise_id = ? AND user_id = ?
+                                 GROUP BY date
+                                 ORDER BY date ASC
+                                 `).all(activeExerciseId, userId) as { date: string; actual_1rm: number | null; max_weight: number }[];
 
-    const formattedChartSets = chartSets.map(s => ({
-        date: s.date,
-        estimated_1rm: Math.round((isImperial ? s.estimated_1rm * 2.20462 : s.estimated_1rm) * 10) / 10
-    }));
+                                 const formattedChartSets = chartSets.map(s => {
+                                     let value = s.actual_1rm !== null ? s.actual_1rm : s.max_weight;
+                                     if (isImperial) value = value * 2.20462;
+                                     return {
+                                         date: s.date,
+                                         estimated_1rm: Math.round(value * 10) / 10,
+                                                                          is_actual: s.actual_1rm !== null   // used for tooltip
+                                     };
+                                 });
 
     const fullHistoryFeed = db.prepare(`
     SELECT w.id, w.date, w.exercise_id, w.weight, w.reps, w.estimated_1rm, e.name as exercise_name
@@ -354,4 +426,100 @@ export async function getDashboardData(selectedExerciseId?: number, userId?: num
             maxBench1RM: Math.round(maxBench1RM * 10) / 10
         }
     };
+}
+// ========== WORKOUT ROUTINES ==========
+export async function getRoutines(userId: number) {
+    return db.prepare(`SELECT * FROM routines WHERE user_id = ? ORDER BY created_at DESC`).all(userId);
+}
+
+export async function getRoutine(userId: number, routineId: number) {
+    const routine = db.prepare(`SELECT * FROM routines WHERE id = ? AND user_id = ?`).get(routineId, userId);
+    if (!routine) return null;
+    const exercises = db.prepare(`
+    SELECT re.*, e.name as exercise_name
+    FROM routine_exercises re
+    JOIN exercises e ON re.exercise_id = e.id
+    WHERE re.routine_id = ?
+    ORDER BY re.order_index
+    `).all(routineId);
+    return { ...routine, exercises };
+}
+
+export async function createRoutine(userId: number, name: string) {
+    const info = db.prepare(`INSERT INTO routines (user_id, name) VALUES (?, ?)`).run(userId, name);
+    return info.lastInsertRowid;
+}
+
+export async function updateRoutine(userId: number, routineId: number, name: string, exercises: any[]) {
+    db.prepare(`UPDATE routines SET name = ? WHERE id = ? AND user_id = ?`).run(name, routineId, userId);
+    db.prepare(`DELETE FROM routine_exercises WHERE routine_id = ?`).run(routineId);
+    const insert = db.prepare(`INSERT INTO routine_exercises (routine_id, exercise_id, order_index, target_sets, target_reps, target_weight, rest_seconds) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    for (const ex of exercises) {
+        insert.run(routineId, ex.exercise_id, ex.order_index, ex.target_sets, ex.target_reps, ex.target_weight || null, ex.rest_seconds || 60);
+    }
+    revalidatePath('/');
+}
+
+export async function deleteRoutine(userId: number, routineId: number) {
+    db.prepare(`DELETE FROM routines WHERE id = ? AND user_id = ?`).run(routineId, userId);
+    revalidatePath('/');
+}
+
+// ========== WORKOUT SESSIONS ==========
+export async function startWorkoutSession(userId: number, routineId: number) {
+    const date = new Date().toISOString().split('T')[0];
+    const info = db.prepare(`INSERT INTO workout_sessions (user_id, routine_id, date) VALUES (?, ?, ?)`).run(userId, routineId, date);
+    return info.lastInsertRowid;
+}
+
+export async function getActiveSession(userId: number, sessionId: number) {
+    return db.prepare(`SELECT * FROM workout_sessions WHERE id = ? AND user_id = ?`).get(sessionId, userId);
+}
+
+export async function logSessionSet(sessionId: number, exerciseId: number, setNumber: number, weight: number, reps: number, isWarmup: boolean, isFailure: boolean) {
+    db.prepare(`
+    INSERT INTO workout_session_sets (session_id, exercise_id, set_number, weight, reps, is_warmup, is_failure)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(sessionId, exerciseId, setNumber, weight, reps, isWarmup ? 1 : 0, isFailure ? 1 : 0);
+    revalidatePath('/');
+}
+
+export async function completeWorkoutSession(sessionId: number, notes?: string) {
+    // Mark session completed
+    db.prepare(`UPDATE workout_sessions SET completed_at = CURRENT_TIMESTAMP, notes = ? WHERE id = ?`).run(notes || null, sessionId);
+
+    // Get session details
+    const session = db.prepare(`SELECT user_id, date, routine_id FROM workout_sessions WHERE id = ?`).get(sessionId);
+    if (!session) return;
+
+    // Get all sets of this session
+    const sets = db.prepare(`SELECT * FROM workout_session_sets WHERE session_id = ?`).all(sessionId);
+
+    // Insert each set into workout_sets (for history and analytics)
+    const insertSet = db.prepare(`INSERT INTO workout_sets (date, exercise_id, weight, reps, estimated_1rm, user_id) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const set of sets) {
+        const estimated_1rm = set.reps > 1 ? Math.round(set.weight * (1 + set.reps / 30) * 10) / 10 : set.weight;
+        insertSet.run(session.date, set.exercise_id, set.weight, set.reps, estimated_1rm, session.user_id);
+    }
+
+    revalidatePath('/');
+}
+
+export async function getLastSuccessfulWeight(userId: number, exerciseId: number) {
+    const row = db.prepare(`
+    SELECT weight, reps FROM workout_sets
+    WHERE user_id = ? AND exercise_id = ? AND estimated_1rm > 0
+    ORDER BY date DESC LIMIT 1
+    `).get(userId, exerciseId);
+    return row as { weight: number; reps: number } | null;
+}
+
+export async function getWorkoutSessions(userId: number) {
+    return db.prepare(`
+    SELECT ws.*, r.name as routine_name
+    FROM workout_sessions ws
+    JOIN routines r ON ws.routine_id = r.id
+    WHERE ws.user_id = ?
+    ORDER BY ws.date DESC
+    `).all(userId);
 }

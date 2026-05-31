@@ -9,6 +9,8 @@ import {
     Layers, Calendar, User, Zap, Bell, Timer, AlertTriangle, Flame, Ruler
 } from 'lucide-react';
 
+import WorkoutsView from './components/views/WorkoutsView';
+
 import { updateSetting } from '../lib/actions';
 import {
     logWeight,
@@ -386,12 +388,12 @@ export default function Dashboard() {
 
         const menuItems = [
             { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-            { id: 'analytics', label: 'Analytics Curve', icon: BarChart3 },
+            { id: 'workouts', label: 'Workouts', icon: Dumbbell },
             { id: 'pbs', label: 'Personal Bests', icon: Trophy },
-            { id: 'photos', label: 'Progress Ledger', icon: Camera },
-            { id: 'history', label: 'Timeline History', icon: History },
-            { id: 'tools', label: 'Calculation Suite', icon: Wrench },
-            { id: 'settings', label: 'Settings Panel', icon: Settings },
+            { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+            { id: 'photos', label: 'Progression Pictures', icon: Camera },
+            { id: 'history', label: 'History', icon: History },
+            { id: 'tools', label: 'Tools and Calculators', icon: Wrench },
         ];
 
         return (
@@ -487,6 +489,7 @@ export default function Dashboard() {
                 cardBg={cardBg}
                 />
             )}
+
             {activeMenu === 'photos' && (
                 <ProgressPhotosView
                 cardBg={cardBg}
@@ -507,6 +510,9 @@ export default function Dashboard() {
                 cardBg={cardBg}
                 isLight={isLight}
                 />
+            )}
+            {activeMenu === 'workouts' && (
+                <WorkoutsView cardBg={cardBg} isLight={isLight} exercises={data.exercises} />
             )}
             {activeMenu === 'tools' && (
                 <ToolsView
