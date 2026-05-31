@@ -29,10 +29,18 @@ import {
     Target,
     TrendingUp,
     Layers,
-    Calendar
+    Calendar,
+    User,
+    Zap,
+    Bell,
+    Timer,
+    AlertTriangle,
+    Flame,
+    Ruler
 } from 'lucide-react';
 import {
     logWeight,
+    deleteWeight,
     createExercise,
     deleteExercise,
     logWorkoutSet,
@@ -57,9 +65,28 @@ export default function Dashboard() {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [targetExercise, setTargetExercise] = useState<number>(0);
     const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
+    const [historySearch, setHistorySearch] = useState('');
 
     // Theme Toggle Engine
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
+    const [weightGoal, setWeightGoal] = useState<string>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem('trackerbuddy_weight_goal') || '';
+        return '';
+    });
+    const [weightGoalInput, setWeightGoalInput] = useState('');
+    const [panelWeightOpen, setPanelWeightOpen] = useState(true);
+    const [panelExerciseOpen, setPanelExerciseOpen] = useState(true);
+
+    // Profile & Training Preferences (localStorage)
+    const [profileName, setProfileName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_name') || '' : '');
+    const [profileAge, setProfileAge] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_age') || '' : '');
+    const [profileGender, setProfileGender] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_gender') || 'male' : 'male');
+    const [profileHeight, setProfileHeight] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_height') || '' : '');
+    const [trainingGoal, setTrainingGoal] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_training_goal') || 'strength' : 'strength');
+    const [experienceLevel, setExperienceLevel] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_experience_level') || 'intermediate' : 'intermediate');
+    const [trainingDaysPerWeek, setTrainingDaysPerWeek] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_training_days') || '4' : '4');
+    const [restTimerSeconds, setRestTimerSeconds] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_rest_timer') || '180' : '180');
+    const [profileSaved, setProfileSaved] = useState(false);
 
     // Progress Photos State
     const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
@@ -92,12 +119,12 @@ export default function Dashboard() {
     const [calcReps, setCalcReps] = useState('5');
     const [plateTarget, setPlateTarget] = useState('100');
     const [plateBar, setPlateBar] = useState('20');
-    const [bmiHeight, setBmiHeight] = useState('180');
+    const [bmiHeight, setBmiHeight] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_height') || '180' : '180');
     const [bmiWeight, setBmiWeight] = useState('80');
     const [tdeeWeight, setTdeeWeight] = useState('80');
-    const [tdeeHeight, setTdeeHeight] = useState('180');
-    const [tdeeAge, setTdeeAge] = useState('25');
-    const [tdeeGender, setTdeeGender] = useState('male');
+    const [tdeeHeight, setTdeeHeight] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_height') || '180' : '180');
+    const [tdeeAge, setTdeeAge] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_age') || '25' : '25');
+    const [tdeeGender, setTdeeGender] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_gender') || 'male' : 'male');
     const [tdeeActivity, setTdeeActivity] = useState('1.55');
 
     useEffect(() => {
@@ -135,6 +162,26 @@ export default function Dashboard() {
                 await logWeight(weightDate, parseFloat(weightVal));
                 setWeightVal('');
                 refreshData();
+            };
+
+            const handleDeleteWeight = async (date: string) => {
+                if (!confirm('Remove this weight entry?')) return;
+                try {
+                    await deleteWeight(date);
+                    refreshData();
+                } catch (err) {
+                    console.error('deleteWeight failed:', err);
+                    alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+                }
+            };
+
+            const handleSaveWeightGoal = (e: React.FormEvent) => {
+                e.preventDefault();
+                const val = weightGoalInput.trim();
+                if (!val) return;
+                setWeightGoal(val);
+                localStorage.setItem('trackerbuddy_weight_goal', val);
+                setWeightGoalInput('');
             };
 
             const handleWorkoutSubmit = async (e: React.FormEvent) => {
@@ -441,7 +488,7 @@ export default function Dashboard() {
             <div className="flex-1 flex overflow-hidden relative pt-16 md:pt-0">
             <main className="flex-1 flex flex-col h-full overflow-hidden p-4 md:p-8 space-y-6">
 
-            <div className="flex items-center justify-between shrink-0">
+            <div className="hidden md:flex items-center justify-between shrink-0">
             <div>
             <div className="flex items-center gap-2 text-xl font-black tracking-tighter uppercase">
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">TRACKER</span>
@@ -467,6 +514,19 @@ export default function Dashboard() {
             )}
             </div>
             </div>
+
+            {/* Mobile exercise selector — shown only when needed */}
+            {(activeMenu === 'dashboard' || activeMenu === 'analytics') && data.exercises.length > 0 && (
+                <div className="md:hidden shrink-0">
+                <select
+                value={targetExercise}
+                onChange={(e) => { const id = parseInt(e.target.value); setTargetExercise(id); refreshData(id); }}
+                className={`w-full border rounded-xl text-xs font-bold px-4 py-2.5 outline-none cursor-pointer ${isLight ? 'bg-white border-zinc-200 text-zinc-700' : 'bg-[#141417] border-[#26262B] text-zinc-200'}`}
+                >
+                {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                </select>
+                </div>
+            )}
 
             <div className="flex-1 min-h-0 overflow-y-auto pr-1">
 
@@ -738,23 +798,108 @@ export default function Dashboard() {
 
             {/* COMPONENT 5: TIMELINE HISTORY */}
             {activeMenu === 'history' && (
-                <div className={`${cardBg} rounded-2xl p-5 h-full flex flex-col min-h-0 space-y-4`}>
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Chronological Training Logs Matrix</h3>
-                <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-                {Object.keys(groupedHistory).length === 0 ? (
-                    <p className="text-zinc-400 text-center py-8">Timeline registers currently empty.</p>
+                <div className="space-y-4 h-full flex flex-col min-h-0">
+
+                {/* Weight log section - grouped by month */}
+                <div className={`${cardBg} rounded-2xl overflow-hidden shrink-0`}>
+                <div className={`flex items-center gap-2 p-4 border-b ${isLight ? 'border-zinc-100' : 'border-zinc-800/60'}`}>
+                <Scale className="h-3.5 w-3.5 text-amber-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Weight Log</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isLight ? 'bg-zinc-100 text-zinc-500' : 'bg-zinc-800 text-zinc-400'}`}>{data.weightData.length} entries</span>
+                </div>
+                {data.weightData.length === 0 ? (
+                    <p className="text-zinc-400 text-center py-6 text-xs">No weight logs yet.</p>
                 ) : (
-                    Object.entries(groupedHistory).map(([date, sets]) => {
-                        const isExpanded = expandedDays[date] !== false;
+                    <div className="max-h-64 overflow-y-auto text-xs">
+                    {(() => {
+                        const byMonth: Record<string, WeightData[]> = {};
+                        [...data.weightData].reverse().forEach(w => {
+                            const month = w.date.slice(0, 7); // "2026-05"
+                            if (!byMonth[month]) byMonth[month] = [];
+                            byMonth[month].push(w);
+                        });
+                        return Object.entries(byMonth).map(([month, entries]) => {
+                            const isMonthExpanded = expandedDays[`wt-${month}`] === true;
+                            const monthLabel = new Date(month + '-01').toLocaleString('default', { month: 'long', year: 'numeric' });
+                            return (
+                                <div key={`wt-${month}`} className={`border-b last:border-b-0 ${isLight ? 'border-zinc-100' : 'border-zinc-800/40'}`}>
+                                <button
+                                onClick={() => toggleDayExpansion(`wt-${month}`)}
+                                className={`w-full flex items-center justify-between px-4 py-3 font-bold transition-colors ${isLight ? 'hover:bg-zinc-50 text-zinc-800' : 'hover:bg-zinc-800/20 text-zinc-200'}`}
+                                >
+                                <div className="flex items-center gap-3">
+                                <span>{monthLabel}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isLight ? 'bg-zinc-100 text-zinc-500' : 'bg-zinc-800 text-zinc-400'}`}>{entries.length} entries</span>
+                                </div>
+                                {isMonthExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-400" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-400" />}
+                                </button>
+                                {isMonthExpanded && (
+                                    <div className={`divide-y ${isLight ? 'divide-zinc-100' : 'divide-zinc-800/40'}`}>
+                                    {entries.map(w => (
+                                        <div key={`weight-${w.date}`} className={`flex items-center justify-between px-6 py-2.5 group ${isLight ? 'hover:bg-zinc-50' : 'hover:bg-zinc-800/20'}`}>
+                                        <span className={`font-mono ${isLight ? 'text-zinc-500' : 'text-zinc-400'}`}>{w.date}</span>
+                                        <div className="flex items-center gap-3">
+                                        <span className="font-black text-amber-500">{w.weight} {unitLabel}</span>
+                                        <button
+                                        onClick={() => handleDeleteWeight(w.date)}
+                                        className="p-1.5 rounded-lg transition-colors text-zinc-400 hover:text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100"
+                                        title="Delete entry"
+                                        >
+                                        <Trash2 className="h-3 w-3" />
+                                        </button>
+                                        </div>
+                                        </div>
+                                    ))}
+                                    </div>
+                                )}
+                                </div>
+                            );
+                        });
+                    })()}
+                    </div>
+                )}
+                </div>
+
+                {/* Workout sets section */}
+                <div className={`${cardBg} rounded-2xl p-4 flex flex-col flex-1 min-h-0 space-y-3`}>
+                <div className="flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                <Dumbbell className="h-3.5 w-3.5 text-rose-500" />
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Workout Sets</span>
+                </div>
+                <input
+                value={historySearch}
+                onChange={e => setHistorySearch(e.target.value)}
+                placeholder="Search exercise..."
+                className={`text-xs border rounded-xl px-3 py-1.5 w-40 focus:outline-none focus:border-amber-500 transition-colors ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800 placeholder:text-zinc-400' : 'bg-[#1E1E22] border-zinc-700 text-white placeholder:text-zinc-600'}`}
+                />
+                </div>
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                {(() => {
+                    const q = historySearch.toLowerCase().trim();
+                    const filteredHistory = Object.entries(groupedHistory)
+                    .map(([date, sets]) => {
+                        const filtered = q ? sets.filter(s => s.exercise_name?.toLowerCase().includes(q)) : sets;
+                        return [date, filtered] as [string, WorkoutSet[]];
+                    })
+                    .filter(([, sets]) => sets.length > 0)
+                    .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime());
+
+                    if (filteredHistory.length === 0) return (
+                        <p className="text-zinc-400 text-center py-8">{q ? 'No results found.' : 'Timeline registers currently empty.'}</p>
+                    );
+
+                    return filteredHistory.map(([date, sets]) => {
+                        const isExpanded = expandedDays[date] === true;
                         return (
                             <div key={date} className={`border rounded-xl overflow-hidden ${isLight ? 'border-zinc-200 bg-zinc-50/50' : 'border-zinc-800 bg-zinc-900/20'}`}>
                             <button
                             onClick={() => toggleDayExpansion(date)}
-                            className={`w-full flex items-center justify-between p-3.5 transition-colors border-b font-bold ${isLight ? 'bg-zinc-100/80 hover:bg-zinc-200/50 border-zinc-200 text-zinc-800' : 'bg-[#1C1C21] hover:bg-zinc-800/60 border-zinc-800 text-zinc-200'}`}
+                            className={`w-full flex items-center justify-between p-3.5 transition-colors font-bold ${isLight ? 'bg-zinc-100/80 hover:bg-zinc-200/50 text-zinc-800' : 'bg-[#1C1C21] hover:bg-zinc-800/60 text-zinc-200'}`}
                             >
                             <div className="flex items-center gap-3">
                             <span className={isLight ? 'text-zinc-900' : 'text-white'}>{date}</span>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isLight ? 'bg-zinc-200 text-zinc-600' : 'bg-zinc-800 text-zinc-400'}`}>{sets.length} Sets Logged</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${isLight ? 'bg-zinc-200 text-zinc-600' : 'bg-zinc-800 text-zinc-400'}`}>{sets.length} sets</span>
                             </div>
                             {isExpanded ? <ChevronDown className="h-4 w-4 text-zinc-400" /> : <ChevronRight className="h-4 w-4 text-zinc-400" />}
                             </button>
@@ -763,14 +908,13 @@ export default function Dashboard() {
                                 <div className="p-2 space-y-1.5">
                                 {sets.map(set => (
                                     <div key={set.id} className={`flex items-center justify-between p-3 border rounded-xl transition-all ${isLight ? 'bg-white border-zinc-200/80 hover:border-zinc-300' : 'bg-[#141417] border-zinc-800/60 hover:border-zinc-700'}`}>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 flex-1 items-center">
-                                    <span className="font-bold">{set.exercise_name}</span>
-                                    <span className="text-zinc-400 font-medium">{set.weight} {unitLabel} × {set.reps} Reps</span>
-                                    <span className="text-rose-500 font-black text-[11px] sm:text-right">Est 1RM: {Math.round(set.estimated_1rm * 10) / 10} {unitLabel}</span>
+                                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                    <span className="font-bold truncate">{set.exercise_name}</span>
+                                    <span className="text-zinc-400">{set.weight} {unitLabel} × {set.reps} reps</span>
                                     </div>
                                     <button
-                                    onClick={async () => { if(confirm("Prune this log entry?")) { await deleteWorkoutSet(set.id); refreshData(); } }}
-                                    className="text-zinc-400 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-500/10 transition-colors ml-4"
+                                    onClick={async () => { if(confirm('Remove this set?')) { await deleteWorkoutSet(set.id); refreshData(); } }}
+                                    className="text-zinc-400 hover:text-rose-500 p-2 rounded-lg hover:bg-rose-500/10 transition-colors ml-3 shrink-0"
                                     >
                                     <Trash2 className="h-3.5 w-3.5" />
                                     </button>
@@ -780,8 +924,9 @@ export default function Dashboard() {
                             )}
                             </div>
                         );
-                    })
-                )}
+                    });
+                })()}
+                </div>
                 </div>
                 </div>
             )}
@@ -893,148 +1038,207 @@ export default function Dashboard() {
 
             {/* COMPONENT 7: SETTINGS PANEL */}
             {activeMenu === 'settings' && (
-                <div className="space-y-6 max-w-4xl text-xs">
+                <div className="space-y-5 w-full text-xs">
 
-                <div className={`${cardBg} rounded-2xl p-6 space-y-5`}>
+                {/* Section label helper */}
+                {/* ── ROW 1: Appearance + Profile side by side ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                {/* Appearance */}
+                <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
+                <Sun className="h-4 w-4 text-amber-500" />
                 <div>
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Display & Appearance</h3>
-                <p className="text-[11px] text-zinc-400 mt-1">Control the visual theme of the interface.</p>
+                <h3 className="text-xs font-black uppercase tracking-wider">Display & Appearance</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Visual theme for the interface.</p>
                 </div>
-                <div className="space-y-2">
+                </div>
+                <div className="space-y-1.5">
                 <label className="text-zinc-400 font-bold block">Interface Theme</label>
                 <div className="flex gap-3">
-                <button
-                onClick={() => setTheme('light')}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl border font-bold transition-all text-xs ${theme === 'light' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
-                >
-                <Sun className="h-3.5 w-3.5" /> Light Mode
+                <button onClick={() => setTheme('light')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border font-bold transition-all ${theme === 'light' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}>
+                <Sun className="h-3.5 w-3.5" /> Light
                 </button>
-                <button
-                onClick={() => setTheme('dark')}
-                className={`flex items-center gap-2 px-4 py-3 rounded-xl border font-bold transition-all text-xs ${theme === 'dark' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}
-                >
-                <Moon className="h-3.5 w-3.5" /> Dark Mode
+                <button onClick={() => setTheme('dark')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border font-bold transition-all ${theme === 'dark' ? 'bg-amber-500 border-amber-500 text-black shadow-md' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}>
+                <Moon className="h-3.5 w-3.5" /> Dark
                 </button>
                 </div>
+                </div>
+                <div className="space-y-1.5 pt-1">
+                <label className="text-zinc-400 font-bold block">Dashboard Default Exercise</label>
+                <select
+                value={localStorage.getItem('trackerbuddy_default_exercise') || (data.exercises[0]?.id.toString() || '')}
+                onChange={(e) => { localStorage.setItem('trackerbuddy_default_exercise', e.target.value); setTargetExercise(parseInt(e.target.value)); }}
+                className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
+                >
+                {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                </select>
                 </div>
                 </div>
 
+                {/* Profile */}
                 <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
+                <User className="h-4 w-4 text-blue-500" />
                 <div>
-                <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Automated Workspace Data Exports</h3>
-                <p className="text-[11px] text-zinc-400 mt-1">Acquire an external spreadsheet snapshot of your metrics and performance history logs.</p>
+                <h3 className="text-xs font-black uppercase tracking-wider">Athlete Profile</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Pre-fills BMI & TDEE calculators in Tools.</p>
                 </div>
-                <div className="pt-2">
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                <label className="text-zinc-400 font-bold">Age</label>
+                <input type="number" value={profileAge} onChange={e => setProfileAge(e.target.value)} placeholder="e.g. 28" className={`w-full border rounded-xl px-3 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} />
+                </div>
+                <div className="space-y-1">
+                <label className="text-zinc-400 font-bold">Height ({data.settings.height_unit})</label>
+                <input type="number" value={profileHeight} onChange={e => setProfileHeight(e.target.value)} placeholder={data.settings.height_unit === 'cm' ? '180' : '71'} className={`w-full border rounded-xl px-3 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} />
+                </div>
+                <div className="col-span-2 space-y-1">
+                <label className="text-zinc-400 font-bold">Biological Sex</label>
+                <div className="flex gap-3">
+                {['male', 'female'].map(g => (
+                    <button key={g} onClick={() => setProfileGender(g)} className={`flex-1 py-2.5 rounded-xl border font-bold capitalize transition-all ${profileGender === g ? 'bg-blue-500 border-blue-500 text-white' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}>{g}</button>
+                ))}
+                </div>
+                </div>
+                </div>
                 <button
-                onClick={exportToCSV}
-                className={`inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-bold transition-all shadow-sm border
-                    ${isLight ? 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-800' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white'}`}
-                    >
-                    <Download className="h-4 w-4 text-amber-500" /> Export Performance Ledger (.CSV)
+                onClick={() => {
+                    localStorage.setItem('tb_profile_age', profileAge);
+                    localStorage.setItem('tb_profile_gender', profileGender);
+                    localStorage.setItem('tb_profile_height', profileHeight);
+                    // Sync tools calculators immediately
+                    if (profileHeight) { setBmiHeight(profileHeight); setTdeeHeight(profileHeight); }
+                    if (profileAge) setTdeeAge(profileAge);
+                    setTdeeGender(profileGender);
+                    setProfileSaved(true);
+                    setTimeout(() => setProfileSaved(false), 2000);
+                }}
+                className="w-full bg-blue-500 hover:bg-blue-400 text-white font-black py-2.5 rounded-xl transition-colors text-[10px] uppercase tracking-wide"
+                >
+                {profileSaved ? '✓ Saved' : 'Save Profile'}
+                </button>
+                </div>
+                </div>
+
+                {/* ── ROW 2: Measurements ── */}
+                <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
+                <Ruler className="h-4 w-4 text-emerald-500" />
+                <div>
+                <h3 className="text-xs font-black uppercase tracking-wider">Units & Measurements</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Global unit system applied across all metrics.</p>
+                </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                <label className="text-zinc-400 font-bold block">Weight Unit</label>
+                <div className="flex gap-2">
+                {[{val:'kg',label:'kg'},{val:'lbs',label:'lbs'}].map(opt => (
+                    <button key={opt.val} onClick={async () => { await updateSetting('weight_unit', opt.val); refreshData(); }} className={`flex-1 py-2.5 rounded-xl border font-bold transition-all text-[11px] ${data.settings.weight_unit === opt.val ? 'bg-emerald-500 border-emerald-500 text-white' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}>{opt.label}</button>
+                ))}
+                </div>
+                </div>
+                <div className="space-y-1.5">
+                <label className="text-zinc-400 font-bold block">Height Unit</label>
+                <div className="flex gap-2">
+                {[{val:'cm',label:'cm'},{val:'in',label:'in'}].map(opt => (
+                    <button key={opt.val} onClick={async () => { await updateSetting('height_unit', opt.val); refreshData(); }} className={`flex-1 py-2.5 rounded-xl border font-bold transition-all text-[11px] ${data.settings.height_unit === opt.val ? 'bg-emerald-500 border-emerald-500 text-white' : isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-600 hover:bg-zinc-100' : 'bg-[#1E1E22] border-zinc-700 text-zinc-400 hover:bg-zinc-800'}`}>{opt.label}</button>
+                ))}
+                </div>
+                </div>
+                <div className="space-y-1.5">
+                <label className="text-zinc-400 font-bold block">1RM Formula</label>
+                <select value={data.settings.one_rm_formula} onChange={async (e) => { await updateSetting('one_rm_formula', e.target.value); refreshData(); }} className={`w-full border rounded-xl px-3 py-2.5 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}>
+                <option value="brzycki">Brzycki</option>
+                <option value="epley">Epley</option>
+                </select>
+                </div>
+                </div>
+                </div>
+
+                {/* ── ROW 3: Exercises + Export ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+                {/* Exercises - spans full width now */}
+                <div className={`${cardBg} rounded-2xl p-6 space-y-4 lg:col-span-3`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
+                <Dumbbell className="h-4 w-4 text-rose-500" />
+                <div>
+                <h3 className="text-xs font-black uppercase tracking-wider">Exercise Library</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Manage tracked movements.</p>
+                </div>
+                </div>
+                <div className="flex gap-3">
+                <input type="text" placeholder="e.g. Incline Bench Press" value={newExerciseName} onChange={(e) => setNewExerciseName(e.target.value)} className={`flex-1 border rounded-xl px-4 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} onKeyDown={e => { if(e.key==='Enter') { e.preventDefault(); handleCreateExercise(e as any); }}} />
+                <button onClick={async (e) => { e.preventDefault(); if(!newExerciseName) return; await createExercise(newExerciseName); setNewExerciseName(''); refreshData(); }} className="bg-amber-500 text-black font-black px-5 py-2.5 rounded-xl hover:bg-amber-400 transition-colors shrink-0">
+                Add
+                </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                {data.exercises.map(ex => (
+                    <div key={ex.id} className={`flex items-center justify-between p-3 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-[#1E1E22] border-zinc-800'}`}>
+                    <span className="font-bold text-zinc-500 dark:text-zinc-300">{ex.name}</span>
+                    <button onClick={async () => { if(confirm(`Delete "${ex.name}"? All linked sets will also be removed.`)) { await deleteExercise(ex.id); refreshData(); }}} className="text-zinc-400 hover:text-rose-500 p-1.5 rounded-lg transition-colors">
+                    <Trash2 className="h-3.5 w-3.5" />
                     </button>
                     </div>
-                    </div>
+                ))}
+                </div>
+                </div>
+                </div>
 
-                    <div className={`${cardBg} rounded-2xl p-6 space-y-5`}>
-                    <div>
-                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Localization & Preference Standardizations</h3>
-                    <p className="text-[11px] text-zinc-400 mt-1">Configure global structural units and layout defaults applied dynamically system-wide.</p>
-                    </div>
+                {/* ── ROW 4: Export + Danger Zone ── */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
-                    <div className="space-y-2">
-                    <label className="text-zinc-400 font-bold block">Weight Metric Scale</label>
-                    <select
-                    value={data.settings.weight_unit}
-                    onChange={async (e) => { await updateSetting('weight_unit', e.target.value); refreshData(); }}
-                    className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
-                    >
-                    <option value="kg">Metric System (kg)</option>
-                    <option value="lbs">Imperial System (lbs)</option>
-                    </select>
-                    </div>
+                {/* Export */}
+                <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
+                <Download className="h-4 w-4 text-amber-500" />
+                <div>
+                <h3 className="text-xs font-black uppercase tracking-wider">Data Export</h3>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Download a full snapshot of your logs.</p>
+                </div>
+                </div>
+                <p className="text-zinc-400 leading-relaxed">Exports all body weight entries, workout sets, and exercise history as a CSV file you can open in Excel or Sheets.</p>
+                <button onClick={exportToCSV} className={`w-full inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-bold transition-all border ${isLight ? 'bg-zinc-100 hover:bg-zinc-200 border-zinc-300 text-zinc-800' : 'bg-zinc-800 hover:bg-zinc-700 border-zinc-700 text-white'}`}>
+                <Download className="h-4 w-4 text-amber-500" /> Export as CSV
+                </button>
+                </div>
 
-                    <div className="space-y-2">
-                    <label className="text-zinc-400 font-bold block">Height Coordinates Scale</label>
-                    <select
-                    value={data.settings.height_unit}
-                    onChange={async (e) => { await updateSetting('height_unit', e.target.value); refreshData(); }}
-                    className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
-                    >
-                    <option value="cm">Centimeters Scale (cm)</option>
-                    <option value="in">Inches Scale (in)</option>
-                    </select>
-                    </div>
-
-                    <div className="space-y-2">
-                    <label className="text-zinc-400 font-bold block">1RM Analytical Formula Curve</label>
-                    <select
-                    value={data.settings.one_rm_formula}
-                    onChange={async (e) => { await updateSetting('one_rm_formula', e.target.value); refreshData(); }}
-                    className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
-                    >
-                    <option value="brzycki">Brzycki Index Optimization (High Precision)</option>
-                    <option value="epley">Epley Volumetric Formula Curve</option>
-                    </select>
-                    </div>
-
-                    <div className="space-y-2">
-                    <label className="text-zinc-400 font-bold flex items-center gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-amber-500" />
-                    Standard Dashboard Target Lift
-                    </label>
-                    <select
-                    value={localStorage.getItem('trackerbuddy_default_exercise') || (data.exercises[0]?.id.toString() || '')}
-                    onChange={(e) => {
-                        localStorage.setItem('trackerbuddy_default_exercise', e.target.value);
-                        setTargetExercise(parseInt(e.target.value));
-                    }}
-                    className={`w-full border rounded-xl px-3.5 py-3 font-semibold outline-none cursor-pointer ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
-                    >
-                    {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
-                    </select>
-                    </div>
-                    </div>
-                    </div>
-
-                    <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
-                    <div>
-                    <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Exercise Tracked Index Masterlist</h3>
-                    <p className="text-[11px] text-zinc-400 mt-1">Append custom movements directly into selection entry list structures.</p>
-                    </div>
-
-                    <form onSubmit={handleCreateExercise} className="flex gap-3 max-w-xl pt-1">
-                    <input
-                    type="text"
-                    placeholder="e.g. Incline Bench Press"
-                    value={newExerciseName}
-                    onChange={(e) => setNewExerciseName(e.target.value)}
-                    className={`flex-1 border rounded-xl px-4 py-3 font-medium outline-none text-xs ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`}
-                    />
-                    <button type="submit" className="bg-amber-500 text-black font-black text-xs px-5 py-3 rounded-xl hover:bg-amber-400 transition-colors shadow-sm shrink-0">
-                    Register Exercise
-                    </button>
-                    </form>
-
-                    <div className="pt-2">
-                    <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider block mb-2">Registered Active Exercises ({data.exercises.length})</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-60 overflow-y-auto pr-1">
-                    {data.exercises.map(ex => (
-                        <div key={ex.id} className={`flex items-center justify-between p-3 border rounded-xl ${isLight ? 'bg-zinc-50 border-zinc-200' : 'bg-[#1E1E22] border-zinc-800'}`}>
-                        <span className="font-bold text-zinc-400 dark:text-zinc-300">{ex.name}</span>
-                        <button
-                        onClick={async () => { if(confirm(`Prune exercise "${ex.name}"? This action cascades and purges all linked logs.`)) { await deleteExercise(ex.id); refreshData(); } }}
-                        className="text-zinc-400 hover:text-rose-500 p-1.5 rounded-lg transition-colors"
-                        >
-                        <X className="h-4 w-4" />
-                        </button>
-                        </div>
-                    ))}
-                    </div>
-                    </div>
-                    </div>
-
-                    </div>
+                {/* Danger Zone */}
+                <div className={`rounded-2xl p-6 space-y-4 border ${isLight ? 'bg-rose-50/50 border-rose-200' : 'bg-rose-950/20 border-rose-900/40'}`}>
+                <div className="flex items-center gap-2 border-b pb-3 border-rose-200 dark:border-rose-900/40">
+                <AlertTriangle className="h-4 w-4 text-rose-500" />
+                <div>
+                <h3 className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">Danger Zone</h3>
+                <p className="text-[10px] text-rose-400/70 mt-0.5">Irreversible destructive actions.</p>
+                </div>
+                </div>
+                <div className="space-y-2.5">
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${isLight ? 'bg-white border-rose-200' : 'bg-[#1E1E22] border-rose-900/30'}`}>
+                <div>
+                <p className="font-bold text-zinc-700 dark:text-zinc-300">Clear Weight Log</p>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Removes all body weight entries.</p>
+                </div>
+                <button onClick={() => { if(confirm('Clear ALL weight log entries? This cannot be undone.')) { data.weightData.forEach(w => deleteWeight(w.date)); setTimeout(refreshData, 300); }}} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
+                Clear
+                </button>
+                </div>
+                <div className={`flex items-center justify-between p-3 rounded-xl border ${isLight ? 'bg-white border-rose-200' : 'bg-[#1E1E22] border-rose-900/30'}`}>
+                <div>
+                <p className="font-bold text-zinc-700 dark:text-zinc-300">Clear Workout History</p>
+                <p className="text-[10px] text-zinc-400 mt-0.5">Removes all logged sets permanently.</p>
+                </div>
+                <button onClick={() => { if(confirm('Clear ALL workout sets? This cannot be undone.')) { data.fullHistoryFeed.forEach(s => deleteWorkoutSet(s.id)); setTimeout(refreshData, 300); }}} className="px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-[10px] transition-colors shrink-0">
+                Clear
+                </button>
+                </div>
+                </div>
+                </div>
+                </div>
+                </div>
             )}
 
             </div>
@@ -1045,12 +1249,13 @@ export default function Dashboard() {
                 <div className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 lg:hidden" onClick={() => setIsRightPanelOpen(false)} />
             )}
             <aside className={`
-                fixed inset-y-0 right-0 z-50 bg-[#1E1E22] text-white flex flex-col justify-between border-zinc-800/80 transition-all duration-300 ease-in-out h-full
+                fixed inset-y-0 right-0 z-50 bg-[#1E1E22] text-white flex flex-col border-zinc-800/80 transition-all duration-300 ease-in-out h-full
                 lg:relative lg:inset-auto lg:z-10
                 ${isRightPanelOpen
-                    ? 'translate-x-0 w-[340px] p-6 border-l opacity-100 pt-20 lg:pt-8'
+                    ? 'translate-x-0 w-[340px] border-l opacity-100'
             : 'translate-x-full lg:translate-x-0 w-0 p-0 opacity-0 overflow-hidden border-l-0'}
             `}>
+            <div className="flex flex-col h-full p-6 pt-20 lg:pt-6 min-h-0">
             <div className="flex items-center justify-between shrink-0 pb-3 border-b border-zinc-800/60">
             <div>
             <h2 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
@@ -1067,68 +1272,139 @@ export default function Dashboard() {
             </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto space-y-5 py-4 text-xs pr-1">
+            <div className="flex-1 overflow-y-auto space-y-3 py-4 text-xs pr-1">
 
-            <div className="bg-[#141417] rounded-2xl p-4 border border-zinc-800/60 space-y-3.5 shadow-md">
+            {/* ── BODY WEIGHT TRACKER ── */}
+            <div className="bg-[#141417] rounded-2xl border border-zinc-800/60 shadow-md overflow-hidden">
+            <button
+            onClick={() => setPanelWeightOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-zinc-800/30 transition-colors"
+            >
             <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-amber-500">
             <Scale className="h-3.5 w-3.5" />
             <span>Body Weight Tracker</span>
             </div>
-            <form onSubmit={handleWeightSubmit} className="space-y-3">
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Date</label>
-            <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors" />
-            </div>
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Bodyweight ({unitLabel})</label>
-            <input type="number" step="0.1" placeholder="e.g. 74.2" value={weightVal} onChange={(e) => setWeightVal(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors" />
-            </div>
-            <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl transition-colors tracking-wide uppercase text-[10px] shadow-md">
-            Save Body Weight
+            <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform duration-200 ${panelWeightOpen ? '' : '-rotate-90'}`} />
             </button>
-            </form>
+
+            {panelWeightOpen && (
+                <div className="px-4 pb-4 space-y-3.5 border-t border-zinc-800/40 pt-3.5">
+
+                {/* Weight Goal */}
+                {(() => {
+                    const currentWeight = data.weightData.length > 0 ? data.weightData[data.weightData.length - 1].weight : null;
+                    const goal = parseFloat(weightGoal);
+                    const hasGoal = !isNaN(goal) && goal > 0;
+                    const progress = hasGoal && currentWeight ? Math.min(100, Math.max(0, (() => {
+                        const startWeight = data.weightData.length > 1 ? data.weightData[0].weight : currentWeight;
+                        const total = Math.abs(goal - startWeight);
+                        const done = Math.abs(currentWeight - startWeight);
+                        return total > 0 ? (done / total) * 100 : 100;
+                    })())) : 0;
+                    return (
+                        <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                        <label className="text-zinc-500 font-semibold flex items-center gap-1">
+                        <Target className="h-3 w-3 text-amber-500" /> Weight Goal ({unitLabel})
+                        </label>
+                        {hasGoal && (
+                            <button onClick={() => { setWeightGoal(''); localStorage.removeItem('trackerbuddy_weight_goal'); }} className="text-zinc-600 hover:text-rose-500 transition-colors">
+                            <X className="h-3 w-3" />
+                            </button>
+                        )}
+                        </div>
+                        {hasGoal ? (
+                            <div className="space-y-1.5">
+                            <div className="flex justify-between text-[10px]">
+                            <span className="text-zinc-500">{currentWeight ?? '--'} {unitLabel}</span>
+                            <span className="text-amber-500 font-bold">{goal} {unitLabel}</span>
+                            </div>
+                            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-gradient-to-r from-amber-500 to-orange-400 rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
+                            </div>
+                            <p className="text-[10px] text-zinc-600 text-right">{Math.round(progress)}% to goal</p>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSaveWeightGoal} className="flex gap-2">
+                            <input type="number" step="0.1" placeholder={`Target (${unitLabel})`} value={weightGoalInput} onChange={e => setWeightGoalInput(e.target.value)} className="flex-1 bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors placeholder:text-zinc-700" />
+                            <button type="submit" className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-500 font-black px-3 py-2 rounded-xl transition-colors shrink-0 border border-amber-500/20">
+                            <Target className="h-3.5 w-3.5" />
+                            </button>
+                            </form>
+                        )}
+                        </div>
+                    );
+                })()}
+
+                {/* Log new weight */}
+                <form onSubmit={handleWeightSubmit} className="space-y-2.5">
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Date</label>
+                <input type="date" value={weightDate} onChange={(e) => setWeightDate(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                </div>
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Bodyweight ({unitLabel})</label>
+                <input type="number" step="0.1" placeholder="e.g. 74.2" value={weightVal} onChange={(e) => setWeightVal(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 transition-colors" />
+                </div>
+                <button type="submit" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-black py-2.5 rounded-xl transition-colors tracking-wide uppercase text-[10px] shadow-md">
+                Save Body Weight
+                </button>
+                </form>
+
+                </div>
+            )}
             </div>
 
-            <div className="bg-[#141417] rounded-2xl p-4 border border-zinc-800/60 space-y-3.5 shadow-md">
+            {/* ── EXERCISE TRACKER ── */}
+            <div className="bg-[#141417] rounded-2xl border border-zinc-800/60 shadow-md overflow-hidden">
+            <button
+            onClick={() => setPanelExerciseOpen(v => !v)}
+            className="w-full flex items-center justify-between px-4 py-3.5 hover:bg-zinc-800/30 transition-colors"
+            >
             <div className="flex items-center gap-1.5 font-bold uppercase tracking-wider text-rose-500">
             <Dumbbell className="h-3.5 w-3.5" />
             <span>Exercise Tracker</span>
             </div>
-            <form onSubmit={handleWorkoutSubmit} className="space-y-3">
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Exercise</label>
-            <select
-            value={logExerciseId}
-            onChange={(e) => setLogExerciseId(e.target.value)}
-            className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-2.5 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors"
-            >
-            {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
-            </select>
-            </div>
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Date</label>
-            <input type="date" value={workoutDate} onChange={(e) => setWorkoutDate(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Load ({unitLabel})</label>
-            <input type="number" step="0.5" placeholder="85" value={benchWeight} onChange={(e) => setBenchWeight(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
-            </div>
-            <div className="space-y-1">
-            <label className="text-zinc-500 font-semibold">Repetitions</label>
-            <input type="number" placeholder="5" value={benchReps} onChange={(e) => setBenchReps(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
-            </div>
-            </div>
-            <button type="submit" className="w-full bg-rose-500 hover:bg-rose-400 text-white font-black py-2.5 rounded-xl transition-colors tracking-wide uppercase text-[10px] shadow-md">
-            Save Exercise
+            <ChevronDown className={`h-3.5 w-3.5 text-zinc-500 transition-transform duration-200 ${panelExerciseOpen ? '' : '-rotate-90'}`} />
             </button>
-            </form>
+
+            {panelExerciseOpen && (
+                <div className="px-4 pb-4 space-y-3 border-t border-zinc-800/40 pt-3.5">
+                <form onSubmit={handleWorkoutSubmit} className="space-y-3">
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Exercise</label>
+                <select
+                value={logExerciseId}
+                onChange={(e) => setLogExerciseId(e.target.value)}
+                className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-2.5 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors"
+                >
+                {data.exercises.map(ex => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                </select>
+                </div>
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Date</label>
+                <input type="date" value={workoutDate} onChange={(e) => setWorkoutDate(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Load ({unitLabel})</label>
+                <input type="number" step="0.5" placeholder="85" value={benchWeight} onChange={(e) => setBenchWeight(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
+                </div>
+                <div className="space-y-1">
+                <label className="text-zinc-500 font-semibold">Reps</label>
+                <input type="number" placeholder="5" value={benchReps} onChange={(e) => setBenchReps(e.target.value)} className="w-full bg-[#1E1E22] border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-rose-500 transition-colors" />
+                </div>
+                </div>
+                <button type="submit" className="w-full bg-rose-500 hover:bg-rose-400 text-white font-black py-2.5 rounded-xl transition-colors tracking-wide uppercase text-[10px] shadow-md">
+                Save Exercise
+                </button>
+                </form>
+                </div>
+            )}
             </div>
 
-            </div>
-
-            {/* Minimalist Branded Typography Block */}
-            <div className="space-y-4 shrink-0 mt-auto pt-4">
+            {/* Brand card — inside scroll so it never causes overflow */}
+            <div className="hidden xl:block pt-2">
             <div className="relative overflow-hidden rounded-2xl bg-zinc-950 p-5 border border-zinc-800/50 select-none group">
             <div className="flex flex-col tracking-tighter leading-none font-black uppercase">
             <span className="text-zinc-800 text-[28px] transition-colors duration-300 group-hover:text-zinc-700">RAW.</span>
@@ -1143,10 +1419,13 @@ export default function Dashboard() {
             </span>
             </div>
             </div>
+            </div>
 
-            <div className="pt-1 flex items-center justify-between text-[10px] text-zinc-600 font-mono tracking-tight">
-            <span>TRACKERBUDDY INTEGRATION</span>
+            <div className="pt-1 flex items-center justify-between text-[10px] text-zinc-700 font-mono tracking-tight shrink-0">
+            <span>TRACKERBUDDY</span>
             <span>BY BILLGOLDBERGMANIA</span>
+            </div>
+
             </div>
             </div>
             </aside>
@@ -1165,5 +1444,6 @@ export default function Dashboard() {
 
             </div>
             </div>
+
             );
 }
