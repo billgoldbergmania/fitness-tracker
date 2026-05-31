@@ -54,7 +54,6 @@ export async function deleteUser(userId: number) {
     return serverActions.deleteUser(userId);
 }
 
-// Weight goal (per user)
 export async function setWeightGoal(goal: number) {
     const userId = getCurrentUserId();
     return serverActions.setWeightGoal(userId, goal);
@@ -63,6 +62,17 @@ export async function setWeightGoal(goal: number) {
 export async function getWeightGoal() {
     const userId = getCurrentUserId();
     return serverActions.getWeightGoal(userId);
+}
+
+// Athlete profile
+export async function getUserProfile() {
+    const userId = getCurrentUserId();
+    return serverActions.getUserProfile(userId);
+}
+
+export async function updateUserProfile(age: number | null, gender: string | null, height_cm: number | null) {
+    const userId = getCurrentUserId();
+    return serverActions.updateUserProfile(userId, age, gender, height_cm);
 }
 
 // Photos

@@ -96,6 +96,15 @@ try {
     if (!userCols.some(c => c.name === 'weight_goal')) {
         db.exec(`ALTER TABLE users ADD COLUMN weight_goal REAL`);
     }
+    if (!userCols.some(c => c.name === 'age')) {
+        db.exec(`ALTER TABLE users ADD COLUMN age INTEGER`);
+    }
+    if (!userCols.some(c => c.name === 'gender')) {
+        db.exec(`ALTER TABLE users ADD COLUMN gender TEXT`);
+    }
+    if (!userCols.some(c => c.name === 'height_cm')) {
+        db.exec(`ALTER TABLE users ADD COLUMN height_cm REAL`);
+    }
 } catch (e) { /* ignore */ }
 
 // Insert default user if missing
@@ -160,9 +169,24 @@ export async function getWeightGoal(userId: number): Promise<number | null> {
     return row?.weight_goal ?? null;
 }
 
+// ========== ATHLETE PROFILE (PER USER) ==========
+export async function getUserProfile(userId: number) {
+    const row = db.prepare(`SELECT age, gender, height_cm FROM users WHERE id = ?`).get(userId) as { age: number | null; gender: string | null; height_cm: number | null } | undefined;
+    return {
+        age: row?.age ?? null,
+        gender: row?.gender ?? null,
+        height_cm: row?.height_cm ?? null,
+    };
+}
+
+export async function updateUserProfile(userId: number, age: number | null, gender: string | null, height_cm: number | null) {
+    db.prepare(`UPDATE users SET age = ?, gender = ?, height_cm = ? WHERE id = ?`).run(age, gender, height_cm, userId);
+    revalidatePath('/');
+}
+
 // ========== SETTINGS ==========
 export async function updateSetting(key: string, value: string) {
-    db.prepare(`INSERT INTO user_settings (key, value) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
+    db.prepare(`INSERT INTO user_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(key, value);
     revalidatePath('/');
 }
 

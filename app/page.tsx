@@ -9,10 +9,10 @@ import {
     Layers, Calendar, User, Zap, Bell, Timer, AlertTriangle, Flame, Ruler
 } from 'lucide-react';
 
-// Only updateSetting comes from the raw server action
+// Only updateSetting comes from the raw server action (no userId needed)
 import { updateSetting } from '../lib/actions';
 
-// Everything else from client wrapper
+// Everything else comes from the client wrapper (auto-injects userId)
 import {
     logWeight,
     deleteWeight,
@@ -24,7 +24,9 @@ import {
     getUsers,
     addUser,
     getWeightGoal,
-    setWeightGoal
+    setWeightGoal,
+    getUserProfile,
+    updateUserProfile
 } from '@/lib/actions-client';
 
 import { getCurrentUserId } from '@/lib/user-client';
@@ -48,26 +50,6 @@ interface ProgressPhoto {
     caption: string;
 }
 
-// Missing types from actions – define locally
-interface WeightData {
-    date: string;
-    weight: number;
-    movingAvg: number | null;
-}
-interface Exercise {
-    id: number;
-    name: string;
-}
-interface WorkoutSet {
-    id: number;
-    date: string;
-    exercise_id: number;
-    exercise_name: string;
-    weight: number;
-    reps: number;
-    estimated_1rm: number;
-}
-
 export default function Dashboard() {
     const [activeMenu, setActiveMenu] = useState('dashboard');
     const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
@@ -77,21 +59,21 @@ export default function Dashboard() {
     const [historySearch, setHistorySearch] = useState('');
 
     const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    // Weight goal – now per user, stored in DB
-    const [weightGoal, setWeightGoalState] = useState<string>('');
+
+    // Weight goal state (per user)
+    const [weightGoal, setWeightGoal] = useState<string>('');
     const [weightGoalInput, setWeightGoalInput] = useState('');
+
     const [panelWeightOpen, setPanelWeightOpen] = useState(true);
     const [panelExerciseOpen, setPanelExerciseOpen] = useState(true);
 
-    const [profileName, setProfileName] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_name') || '' : '');
-    const [profileAge, setProfileAge] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_age') || '' : '');
-    const [profileGender, setProfileGender] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_gender') || 'male' : 'male');
-    const [profileHeight, setProfileHeight] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_height') || '' : '');
-    const [trainingGoal, setTrainingGoal] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_training_goal') || 'strength' : 'strength');
-    const [experienceLevel, setExperienceLevel] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_experience_level') || 'intermediate' : 'intermediate');
-    const [trainingDaysPerWeek, setTrainingDaysPerWeek] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_training_days') || '4' : '4');
-    const [restTimerSeconds, setRestTimerSeconds] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_rest_timer') || '180' : '180');
+    // Athlete profile state (per user, from database)
+    const [profileAge, setProfileAge] = useState<string>('');
+    const [profileGender, setProfileGender] = useState<string>('male');
+    const [profileHeight, setProfileHeight] = useState<string>('');
     const [profileSaved, setProfileSaved] = useState(false);
+    const [profileHeightCm, setProfileHeightCm] = useState<number | null>(null);
+    const [profileGenderState, setProfileGenderState] = useState<string | null>(null);
 
     const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
     const [photoDate, setPhotoDate] = useState(new Date().toISOString().split('T')[0]);
@@ -128,37 +110,8 @@ export default function Dashboard() {
     const [tdeeGender, setTdeeGender] = useState(() => typeof window !== 'undefined' ? localStorage.getItem('tb_profile_gender') || 'male' : 'male');
     const [tdeeActivity, setTdeeActivity] = useState('1.55');
 
-    // Current user name
+    // Current user name for top bar
     const [currentUserName, setCurrentUserName] = useState<string>('');
-
-    // Load user name and weight goal when component mounts or user changes
-    const refreshUserName = async () => {
-        try {
-            const users = await getUsers();
-            const activeId = getCurrentUserId();
-            const active = users.find(u => u.id === activeId);
-            setCurrentUserName(active?.name || 'User');
-        } catch (e) {
-            console.error('Failed to load user name', e);
-        }
-    };
-
-    const loadWeightGoal = async () => {
-        try {
-            const goal = await getWeightGoal();
-            setWeightGoalState(goal !== null ? goal.toString() : '');
-        } catch (e) {
-            console.error('Failed to load weight goal', e);
-        }
-    };
-
-    useEffect(() => {
-        refreshUserName();
-    }, []);
-
-    useEffect(() => {
-        loadWeightGoal();
-    }, [currentUserName]); // Reload when user changes
 
     useEffect(() => {
         document.title = "Trackerbuddy";
@@ -174,6 +127,44 @@ export default function Dashboard() {
         }
         if (window.innerWidth < 1024) setIsRightPanelOpen(false);
     }, []);
+
+        // Load current user name and profile when user changes
+        const refreshUserName = async () => {
+            try {
+                const users = await getUsers();
+                const activeId = getCurrentUserId();
+                const active = users.find(u => u.id === activeId);
+                setCurrentUserName(active?.name || 'User');
+            } catch (e) {
+                console.error('Failed to load user name', e);
+            }
+        };
+
+        useEffect(() => {
+            refreshUserName();
+        }, []);
+
+        // Load profile and weight goal when current user changes
+        useEffect(() => {
+            const loadProfileAndGoal = async () => {
+                try {
+                    const profile = await getUserProfile();
+                    setProfileAge(profile.age?.toString() || '');
+                    setProfileGender(profile.gender || 'male');
+                    setProfileHeight(profile.height_cm?.toString() || '');
+                    setProfileHeightCm(profile.height_cm);
+                    setProfileGenderState(profile.gender);
+
+                    const goal = await getWeightGoal();
+                    setWeightGoal(goal !== null ? goal.toString() : '');
+                } catch (e) {
+                    console.error('Failed to load profile or weight goal', e);
+                }
+            };
+            if (currentUserName) {
+                loadProfileAndGoal();
+            }
+        }, [currentUserName]);
 
         const refreshData = async (exerciseId?: number) => {
             const currentTargetId = exerciseId !== undefined ? exerciseId : targetExercise;
@@ -213,10 +204,14 @@ export default function Dashboard() {
                 if (!val) return;
                 const goalNum = parseFloat(val);
                 if (isNaN(goalNum)) return;
-                await setWeightGoal(goalNum);
-                setWeightGoalState(val);
-                setWeightGoalInput('');
-                // Optionally show a success message
+                try {
+                    await setWeightGoal(goalNum);
+                    setWeightGoal(val);
+                    setWeightGoalInput('');
+                } catch (err) {
+                    console.error('Failed to save weight goal', err);
+                    alert('Failed to save weight goal');
+                }
             };
 
             const handleWorkoutSubmit = async (e: React.FormEvent) => {
@@ -296,7 +291,7 @@ export default function Dashboard() {
                 );
             }
 
-            // Computations (same as before)
+            // --- CLIENT-SIDE PERFORMANCE COMPUTATIONS ---
             const activeExerciseName = data.exercises.find(e => e.id === targetExercise)?.name || 'Exercise';
             const activeExerciseSets = data.fullHistoryFeed.filter(s =>
             s.exercise_id === targetExercise || s.exercise_name?.toLowerCase() === activeExerciseName?.toLowerCase()
@@ -384,6 +379,7 @@ export default function Dashboard() {
 
                 <div className="flex-1 flex overflow-hidden relative pt-16 md:pt-0">
                 <main className="flex-1 flex flex-col h-full overflow-hidden p-4 md:p-8 space-y-6">
+                {/* Desktop top bar */}
                 <div className="hidden md:flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-4">
                 <div>
@@ -395,6 +391,7 @@ export default function Dashboard() {
                 </div>
                 <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 mt-1">your personal weight & performance telemetry platform</p>
                 </div>
+                {/* Username indicator (desktop) */}
                 <div className="flex items-center gap-1.5 ml-3">
                 <User className="h-3.5 w-3.5 text-amber-500" />
                 <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{currentUserName}</span>
@@ -415,6 +412,7 @@ export default function Dashboard() {
                 )}
                 </div>
 
+                {/* Mobile exercise selector */}
                 {(activeMenu === 'dashboard' || activeMenu === 'analytics') && data.exercises.length > 0 && (
                     <div className="md:hidden shrink-0">
                     <select
@@ -437,6 +435,8 @@ export default function Dashboard() {
                     activeExerciseName={activeExerciseName}
                     maxExercise1RM={maxExercise1RM}
                     exercisePopularityRank={exercisePopularityRank}
+                    heightCm={profileHeightCm}
+                    gender={profileGenderState}
                     />
                 )}
                 {activeMenu === 'analytics' && (
@@ -535,7 +535,7 @@ export default function Dashboard() {
                     handleCreateExercise={handleCreateExercise}
                     deleteExercise={deleteExercise}
                     weightGoal={weightGoal}
-                    setWeightGoal={setWeightGoalState}
+                    setWeightGoal={setWeightGoal}
                     unitLabel={unitLabel}
                     tdeeAge={tdeeAge}
                     setTdeeAge={setTdeeAge}

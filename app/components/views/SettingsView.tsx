@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Sun, Moon, User, Ruler, Dumbbell, Download, AlertTriangle, Trash2, Edit2, Save, X, Plus } from 'lucide-react';
-import { getUsers, addUser, updateUserName, deleteUser } from '@/lib/actions';
+import { getUsers, addUser, updateUserName, deleteUser, updateUserProfile } from '@/lib/actions-client';
 import { setCurrentUserId, getCurrentUserId } from '@/lib/user-client';
 
 interface SettingsViewProps {
@@ -67,9 +67,9 @@ export default function SettingsView({
     const handleSwitchUser = async (userId: number) => {
         setCurrentUserId(userId);
         setCurrentUserIdState(userId);
-        refreshData();           // reload dashboard data
-        await refreshUserName(); // update the top bar name
-        await loadUsers();       // refresh user list
+        refreshData();
+        await refreshUserName();
+        await loadUsers();
     };
 
     const handleAddUser = async () => {
@@ -78,7 +78,6 @@ export default function SettingsView({
         setNewUserName('');
         setShowAddUser(false);
         await loadUsers();
-        // Optionally switch to new user? Not automatically, but we could.
     };
 
     const handleRenameUser = async (userId: number) => {
@@ -86,7 +85,6 @@ export default function SettingsView({
         await updateUserName(userId, editName.trim());
         setEditingUserId(null);
         await loadUsers();
-        // If renamed user is current, refresh top bar name
         if (userId === currentUserId) {
             await refreshUserName();
         }
@@ -99,17 +97,27 @@ export default function SettingsView({
         if (userId === currentUserId) {
             setCurrentUserId(1);
             setCurrentUserIdState(1);
-            // Force refresh data and name for the fallback user (id=1)
             refreshData();
             await refreshUserName();
         }
         await loadUsers();
     };
 
-    // ========== RENDER ==========
+    const handleSaveProfile = async () => {
+        await updateUserProfile(
+            profileAge ? parseInt(profileAge) : null,
+                                profileGender,
+                                profileHeight ? parseFloat(profileHeight) : null
+        );
+        setProfileSaved(true);
+        setTimeout(() => setProfileSaved(false), 2000);
+        // Also refresh dashboard to update BMI
+        refreshData();
+    };
+
     return (
         <div className="space-y-5 w-full text-xs">
-        {/* ─── USER MANAGEMENT CARD ─── */}
+        {/* User Management Card */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <User className="h-4 w-4 text-amber-500" />
@@ -206,7 +214,7 @@ export default function SettingsView({
         )}
         </div>
 
-        {/* ─── APPEARANCE ─── */}
+        {/* Appearance Card */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Sun className="h-4 w-4 text-amber-500" />
@@ -238,7 +246,7 @@ export default function SettingsView({
         </div>
         </div>
 
-        {/* ─── PROFILE ─── */}
+        {/* Athlete Profile Card (now saves to DB) */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <User className="h-4 w-4 text-blue-500" />
@@ -253,8 +261,8 @@ export default function SettingsView({
         <input type="number" value={profileAge} onChange={e => setProfileAge(e.target.value)} placeholder="e.g. 28" className={`w-full border rounded-xl px-3 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} />
         </div>
         <div className="space-y-1">
-        <label className="text-zinc-400 font-bold">Height ({data.settings.height_unit})</label>
-        <input type="number" value={profileHeight} onChange={e => setProfileHeight(e.target.value)} placeholder={data.settings.height_unit === 'cm' ? '180' : '71'} className={`w-full border rounded-xl px-3 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} />
+        <label className="text-zinc-400 font-bold">Height (cm)</label>
+        <input type="number" value={profileHeight} onChange={e => setProfileHeight(e.target.value)} placeholder="e.g. 180" className={`w-full border rounded-xl px-3 py-2.5 font-medium outline-none ${isLight ? 'bg-zinc-50 border-zinc-200 text-zinc-800' : 'bg-[#1E1E22] border-[#26262B] text-zinc-200'}`} />
         </div>
         <div className="col-span-2 space-y-1">
         <label className="text-zinc-400 font-bold">Biological Sex</label>
@@ -266,20 +274,14 @@ export default function SettingsView({
         </div>
         </div>
         <button
-        onClick={() => {
-            localStorage.setItem('tb_profile_age', profileAge);
-            localStorage.setItem('tb_profile_gender', profileGender);
-            localStorage.setItem('tb_profile_height', profileHeight);
-            setProfileSaved(true);
-            setTimeout(() => setProfileSaved(false), 2000);
-        }}
+        onClick={handleSaveProfile}
         className="w-full bg-blue-500 hover:bg-blue-400 text-white font-black py-2.5 rounded-xl transition-colors text-[10px] uppercase tracking-wide"
         >
         {profileSaved ? '✓ Saved' : 'Save Profile'}
         </button>
         </div>
 
-        {/* ─── UNITS & MEASUREMENTS ─── */}
+        {/* Units & Measurements, Exercise Library, Export, Danger Zone – unchanged */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Ruler className="h-4 w-4 text-emerald-500" />
@@ -315,7 +317,6 @@ export default function SettingsView({
         </div>
         </div>
 
-        {/* ─── EXERCISE LIBRARY ─── */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Dumbbell className="h-4 w-4 text-rose-500" />
@@ -342,9 +343,7 @@ export default function SettingsView({
         </div>
         </div>
 
-        {/* ─── EXPORT + DANGER ZONE ─── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Export */}
         <div className={`${cardBg} rounded-2xl p-6 space-y-4`}>
         <div className="flex items-center gap-2 border-b pb-3 border-zinc-100 dark:border-zinc-800">
         <Download className="h-4 w-4 text-amber-500" />
@@ -359,7 +358,6 @@ export default function SettingsView({
         </button>
         </div>
 
-        {/* Danger Zone */}
         <div className={`rounded-2xl p-6 space-y-4 border ${isLight ? 'bg-rose-50/50 border-rose-200' : 'bg-rose-950/20 border-rose-900/40'}`}>
         <div className="flex items-center gap-2 border-b pb-3 border-rose-200 dark:border-rose-900/40">
         <AlertTriangle className="h-4 w-4 text-rose-500" />
