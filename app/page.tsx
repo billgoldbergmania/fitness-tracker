@@ -366,12 +366,12 @@ export default function Dashboard() {
 
     const menuItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'analytics', label: 'Analytics Curve', icon: BarChart3 },
-        { id: 'pbs', label: 'Personal Bests', icon: Trophy },
-        { id: 'photos', label: 'Progress Ledger', icon: Camera },
-        { id: 'history', label: 'Timeline History', icon: History },
-        { id: 'tools', label: 'Calculation Suite', icon: Wrench },
         { id: 'workouts', label: 'Workouts', icon: Dumbbell },
+        { id: 'pbs', label: 'Personal Bests', icon: Trophy },
+        { id: 'photos', label: 'Progression Pictures', icon: Camera },
+        { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+        { id: 'history', label: 'History', icon: History },
+        { id: 'tools', label: 'Tools', icon: Wrench },
     ];
 
     return (

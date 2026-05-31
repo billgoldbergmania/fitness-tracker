@@ -1,201 +1,104 @@
-TrackerBuddy
+# Trackerbuddy – Fitness Tracker for the Local Athlete
 
-A sleek, no-nonsense fitness tracker for logging workouts, tracking progress, and staying on top of your gains.
+> **Honest, private, no subscriptions** – a fitness tracker that runs entirely on your own computer. All data stays in a local SQLite file. You own it.
 
+---
 
+## ✨ Features
 
-🏋️ About TrackerBuddy
+- **Track body weight** – log daily weight, see trends, set a goal.
+- **Track exercises** – log sets, reps, weight; automatic 1RM estimation.
+- **Multi‑user support** – add family members or training partners, switch users instantly. Each user’s data stays separate.
+- **Workout routines** – create routines (e.g. “Chest Day”), log sets during a guided workout, mark warm‑up sets, track failures.
+- **Progress photos** – upload photos (stored per user) and see your transformation.
+- **Performance analytics** – charts for body weight and 1RM progression, personal bests, volume ranking.
+- **Export to CSV** – backup or analyse your logs in any spreadsheet.
+- **Dark / Light theme** – choose what’s comfortable.
+- **Units** – kilograms or pounds, centimetres or inches.
 
-TrackerBuddy is a minimalist fitness tracking app built for athletes and fitness enthusiasts who want to log workouts, monitor progress, and analyze performance without the fluff. Whether you're lifting, running, or training for a sport, TrackerBuddy keeps your data organized and accessible.
+All data is stored in a single `tracker.db` file on your machine. No cloud, no accounts, no telemetry.
 
+---
+## Screenshots
 
 
-🔥 Key Features
 
-📊 Dashboard
 
+-----
 
+## 🚀 How to run it (for yourself)
 
+1. **Install Node.js** (version 18 or newer) – [nodejs.org](https://nodejs.org)
 
+2. **Clone or download the repository**
+   ```bash
+   git clone https://github.com/yourusername/trackerbuddy.git
+   cd trackerbuddy
 
-Real-time metrics: Track weight, 1RM (one-rep max), and progress over time.
+    Install dependencies
+    bash
 
+    npm install
 
+    Run the development server
+    bash
 
-Interactive charts: Visualize trends with LineChart graphs (powered by recharts).
+    npm run dev
 
+    Open your browser at http://localhost:3000
 
+    First start – the app creates a tracker.db SQLite file in the project root and seeds default data. All your logs are stored there.
 
-Theme toggle: Switch between light and dark mode for comfortable viewing.
+Optional: run on your local network
+bash
 
-💪 Workout Logging
+npm run dev -- -H 0.0.0.0
 
+Then access from other devices on the same network using your computer’s IP address (e.g. http://192.168.1.10:3000).
 
+📦 Build for production
+bash
 
+npm run build
+npm run start
 
+The app will run in production mode, still using the local SQLite database.
+🖼️ Screenshots
 
-Log exercises: Add, edit, or delete exercises with ease.
+(Add your own screenshots here – dashboard, workout routine editor, history, settings)
+❓ Frequently asked questions
 
+Can I use this on my phone?
+Yes, the interface adapts to mobile screens. Run the server on your computer and open the network URL on your phone’s browser.
 
+Will my data ever leave my computer?
+No. All data is saved in the tracker.db file inside the app folder. No external API calls are made (except to load font icons).
 
-Track sets: Record weights, reps, and dates for every workout.
+Can I migrate my data to another computer?
+Copy the tracker.db file to the new computer’s app folder.
 
+Is there a user login / cloud sync?
+No – this is a local‑first app. Multi‑user is supported, but switching users only changes the active user ID. No passwords, no internet needed.
 
+What if I break something?
+Delete tracker.db and restart the app – it will recreate a fresh database with default data. Your old data will be lost, so keep backups if important.
+🛠️ Tech stack
 
-Exercise history: View a detailed feed of all past workouts.
+    Next.js 16 (Turbopack for development)
 
-📸 Progress Photos
+    SQLite (via better-sqlite3)
 
+    Tailwind CSS
 
+    Recharts
 
+    Lucide icons
 
+📝 License
 
-Upload and manage photos with captions and dates.
+Use it, modify it, share it. No warranty.
+🙌 Credits
 
+Vibecoded by Billgoldbergmania with Deepseek/Claude and Gemini – on Arch btw.
 
-
-Visualize your transformation over time.
-
-🎯 Performance Analytics
-
-
-
-
-
-1RM Calculator: Estimate your one-rep max based on logged sets.
-
-
-
-Trends & Insights: Monitor improvements with data-driven analytics.
-
-🛠️ User Experience
-
-
-
-
-
-Collapsible panels: Expand or collapse sections for a clean, focused interface.
-
-
-
-Mobile-friendly: Fully responsive design for desktop and mobile.
-
-
-
-🛠️ Built With
-
-
-
-
-
-
-
-Category
-
-
-
-Technologies
-
-
-
-
-
-Frontend
-
-
-
-React, TypeScript, Vite
-
-
-
-
-
-UI/UX
-
-
-
-TailwindCSS, Lucide React (icons)
-
-
-
-
-
-Charts
-
-
-
-Recharts
-
-
-
-
-
-State
-
-
-
-React Hooks (useState, useEffect)
-
-
-
-
-
-Data
-
-
-
-Custom actions (logWeight, createExercise, logWorkoutSet, etc.)
-
-
-
-📂 Project Structure
-
-src/
-├── components/          # Reusable UI components
-├── lib/
-│   └── actions.ts       # Data management functions (e.g., logging weights, exercises)
-├── App.tsx              # Main app component
-├── page.tsx             # Dashboard page
-└── ...
-
-
-
-🚀 Why TrackerBuddy?
-
-
-
-
-
-No Fluff: A clean, focused interface designed for serious athletes.
-
-
-
-Data-Driven: Make informed decisions with real-time analytics.
-
-
-
-Simple & Effective: Log workouts, track progress, and stay motivated.
-
-
-
-📸 Screenshots
-
-Add screenshots of your dashboard, workout logging, and progress tracking here.
-
-
-
-📜 License
-
-This project is private and developed by Bill Goldberg.
-
-
-
-🤝 Contributing
-
-This is a personal project, but suggestions and feedback are welcome!
-
-
-
-📞 Contact
-
-For questions or support, reach out to Bill Goldberg.
+This app is not a substitute for professional medical advice. Always consult a physician before starting any fitness program.
