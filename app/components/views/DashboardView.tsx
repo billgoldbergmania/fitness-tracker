@@ -129,7 +129,7 @@ export default function DashboardView({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className={`${cardBg} p-3 rounded-2xl`}>
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">Body Mass Parameter Tracking</h3>
-        <div className="h-52 w-full">
+        <div className="h-52 w-full" style={{ minHeight: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data.weightData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} vertical={false} />
@@ -144,7 +144,7 @@ export default function DashboardView({
 
         <div className={`${cardBg} p-3 rounded-2xl`}>
         <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">{activeExerciseName} Strength Trajectory</h3>
-        <div className="h-52 w-full">
+        <div className="h-52 w-full" style={{ minHeight: 200 }}>
         <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data.selectedExerciseData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} vertical={false} />

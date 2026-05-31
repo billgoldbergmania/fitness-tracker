@@ -76,7 +76,7 @@ export default function AnalyticsView({
         <h3 className="text-xs font-black text-zinc-400 uppercase tracking-wider">Analytical Metric Dynamic Curve ({activeExerciseName})</h3>
         <p className="text-[10px] text-zinc-400 mt-0.5">Visual representation of calculated performance increments over historical data parameters.</p>
         </div>
-        <div className="h-64 lg:flex-1 w-full">
+        <div className="h-64 lg:flex-1 w-full style={{ minHeight: 200 }}">
         <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data.selectedExerciseData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={isLight ? "#E4E4E7" : "#26262B"} />
