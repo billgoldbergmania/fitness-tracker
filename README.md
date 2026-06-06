@@ -21,8 +21,10 @@ All data is stored in a single `tracker.db` file on your machine. No cloud, no a
 ---
 ## Screenshots
 
+![Dashboard TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/dashboard.png?raw=true
+ "TrackerBuddy Dashboard")
 
-
+ 
 
 -----
 
