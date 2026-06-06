@@ -24,7 +24,23 @@ All data is stored in a single `tracker.db` file on your machine. No cloud, no a
 ![Dashboard TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/dashboard.png?raw=true
  "TrackerBuddy Dashboard")
 
+ ![PB TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/pbs.png?raw=true
+ "TrackerBuddy Personal Bests")
+
+![PhotoTrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/photo.png?raw=true
+ "TrackerBuddy Phototracker")
+
+![Tools TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/tools.png?raw=true
+ "TrackerBuddy Tools")
+
+![Workouts TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/workouts.png?raw=true
+ "TrackerBuddy Workout")
  
+![Workouts 2 TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/workout2.png?raw=true
+ "TrackerBuddy Workouts 2")
+ 
+![Dark Mode TrackerBuddy](https://github.com/billgoldbergmania/fitness-tracker/blob/main/website/darkmode.png?raw=true
+ "Dark Mode TrackerBuddy")
 
 -----
 
