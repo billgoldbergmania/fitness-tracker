@@ -50,7 +50,7 @@ All data is stored in a single `tracker.db` file on your machine. No cloud, no a
 
 2. **Clone or download the repository**
    ```bash
-   git clone https://github.com/yourusername/trackerbuddy.git
+   git clone https://github.com/billgoldbergmania/trackerbuddy.git
    cd trackerbuddy
 
     Install dependencies
