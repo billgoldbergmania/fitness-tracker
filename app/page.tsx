@@ -114,8 +114,7 @@ export default function Dashboard() {
     // -------------------- Helper functions --------------------
     const refreshData = async (exerciseId?: number) => {
         const targetId = exerciseId !== undefined ? exerciseId : targetExercise;
-        if (targetId === 0) return; // avoid fetching with exercise 0
-        const res = await getDashboardData(targetId);
+        const res = await getDashboardData(targetId || undefined);
         setData(res);
         if (!logExerciseId && res.exercises.length > 0) {
             setLogExerciseId(res.exercises[0].id.toString());
@@ -173,9 +172,10 @@ export default function Dashboard() {
                 setTargetExercise(targetId);
                 const freshData = await getDashboardData(targetId);
                 setData(freshData);
-                if (freshData.exercises.length > 0 && !logExerciseId) {
-                    setLogExerciseId(freshData.exercises[0].id.toString());
+                if (freshData.exercises.length > 0) {
+                    setLogExerciseId(freshData.exercises[0].id.toString()); // ← always set, not guarded
                 }
+
             } else if (!targetId) {
                 // still no exercises? just load empty data
                 const emptyData = await getDashboardData(0);
